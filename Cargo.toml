@@ -8,10 +8,10 @@ retour = { version = "0.3", features = ["static-detour"] }
 retour-utils = "0.2.1"
 ctor = "0.2.8"
 ntapi = "0.4.1"
-winapi = { version = "0.3.9", features = ["libloaderapi", "winbase", "processthreadsapi", "memoryapi", "synchapi"] }
 dll-syringe = "=0.15.2"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
+windows = { version = "0.58.0", features = ["Win32", "Win32_System", "Win32_System_Diagnostics", "Win32_System_Diagnostics_Debug", "Win32_System_LibraryLoader", "Win32_System_Threading", "Win32_Security"] }
 
 [lib]
 name = "examplemod"
