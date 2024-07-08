@@ -32,29 +32,6 @@ fn inject_dll(dll_name: &str) {
     }
 }
 
-fn kill_process(process: &str) {
-    println!("Killing {} process...", process);
-
-    loop {
-        // find target process by name
-        let target_process = OwnedProcess::find_first_by_name(process);
-
-        match target_process {
-            Some(process) => {
-                match process.kill() {
-                    Ok(_) => {}
-                    Err(e) => {
-                        eprintln!("Failed to kill process: {}", e);
-                        return;
-                    }
-                }
-                println!("Process killed successfully.");
-            }
-            None => return,
-        }
-    }
-}
-
 fn start_factorio() -> Result<PROCESS_INFORMATION, String> {
     let factorio_path = s!(r"C:\Users\zacha\Documents\factorio\bin\x64\factorio.exe");
 
@@ -191,7 +168,7 @@ fn initialize_symbol_handler(process_handle: HANDLE, base_address: u64) -> Resul
     unsafe {
         SymInitialize(process_handle, PCSTR::null(), true).map_err(|e| format!("{}", e))?;
 
-        let file_handler: HANDLE = CreateFileA(
+        /*let file_handler: HANDLE = CreateFileA(
             pdb_file_path,
             GENERIC_READ.0,
             FILE_SHARE_READ,
@@ -199,7 +176,7 @@ fn initialize_symbol_handler(process_handle: HANDLE, base_address: u64) -> Resul
             OPEN_EXISTING,
             FILE_ATTRIBUTE_NORMAL,
             None,
-        ).map_err(|e| format!("{}", e))?;
+        ).map_err(|e| format!("{}", e))?;*/
 
         let load_pdb_result = SymLoadModuleEx(
             process_handle,
@@ -237,7 +214,6 @@ fn main() {
 
     let factorio_process_information;
 
-    kill_process("factorio");
     match start_factorio() {
         Ok(pi) => factorio_process_information = pi,
         Err(e) => {
