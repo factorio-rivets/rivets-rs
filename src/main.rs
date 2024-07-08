@@ -1,3 +1,5 @@
+// 4002e            1bcb170 :   GuiSound::getName
+
 #![allow(unused_imports, unused_variables, dead_code)]
 
 use dll_syringe::process::Process;
@@ -8,6 +10,9 @@ use std::net::TcpListener;
 use std::ptr::{null, null_mut};
 use windows::core::{s, Error, PCSTR, PSTR};
 use windows::Win32::Foundation::{CloseHandle, GetLastError, BOOL, GENERIC_READ, HANDLE};
+use windows::Win32::Storage::FileSystem::{
+    CreateFileA, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ, OPEN_EXISTING,
+};
 use windows::Win32::System::Diagnostics::Debug::{
     SymCleanup, SymEnumLines, SymEnumSymbols, SymEnumerateModules64, SymFromAddr, SymFromName,
     SymGetLineFromAddr64, SymInitialize, SymLoadModuleEx, IMAGEHLP_LINE64,
@@ -15,9 +20,8 @@ use windows::Win32::System::Diagnostics::Debug::{
     SYM_LOAD_FLAGS,
 };
 use windows::Win32::System::Threading::{
-    CreateProcessA, ResumeThread, CREATE_SUSPENDED, PROCESS_INFORMATION, STARTUPINFOA,
+    CreateProcessA, GetCurrentProcess, ResumeThread, CREATE_SUSPENDED, PROCESS_INFORMATION, STARTUPINFOA
 };
-use windows::Win32::Storage::FileSystem::{CreateFileA, FILE_SHARE_READ, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL};
 
 fn inject_dll(dll_name: &str) {
     println!("Injecting DLL into Factorio process...");
@@ -61,6 +65,7 @@ fn start_factorio() -> Result<PROCESS_INFORMATION, String> {
     }
 
     println!("Factorio process created successfully.");
+
     Ok(factorio_process_information)
 }
 
@@ -96,10 +101,7 @@ unsafe extern "system" fn cb(
 
 static mut MODULE_NAME: &'static str = "factorio";
 
-fn get_dll_base_address(
-    module_name: &'static str,
-    process_information: PROCESS_INFORMATION,
-) -> Result<u64, String> {
+fn get_dll_base_address(process_handle: HANDLE, module_name: &'static str) -> Result<u64, String> {
     static mut BASE_ADRESS: Option<u64> = None;
     unsafe { MODULE_NAME = module_name };
 
@@ -120,26 +122,22 @@ fn get_dll_base_address(
         .into()
     }
 
-    let process_handle = process_information.hProcess;
     unsafe {
         SymEnumerateModules64(process_handle, Some(callback), None).unwrap();
     }
 
     match unsafe { BASE_ADRESS } {
         Some(base_address) => Ok(base_address),
-        None => Err("Failed to get Factorio base address.".to_owned()),
+        None => Err("Failed to get DLL base address.".to_owned()),
     }
 }
 
 fn get_symbol_address(
-    factorio_process_information: PROCESS_INFORMATION,
+    pdb_handle: HANDLE,
     symbol_name: PCSTR,
     base_address: u64,
 ) -> Option<*mut std::ffi::c_void> {
     unsafe {
-        // Initialize the symbol handler for the current process.
-        let process_handle: HANDLE = factorio_process_information.hProcess;
-
         // Allocate a buffer for the symbol information
         let buffer_size = std::mem::size_of::<SYMBOL_INFO>() as u32;
         let mut buffer: Vec<u8> = vec![0; buffer_size as usize];
@@ -151,10 +149,10 @@ fn get_symbol_address(
         // Get the symbol information
         //SymFromName(process_handle, symbol_name, sym_info).unwrap();
 
-        //SymFromAddr(process_handle, base_address+1000000, None, sym_info).unwrap();
-        //print_symbol_info(sym_info);
+        SymFromAddr(pdb_handle, base_address+0x1bcb170, None, sym_info).unwrap();
+        print_symbol_info(sym_info);
 
-        SymEnumSymbols(process_handle, base_address, s!("*!*"), Some(cb), None).unwrap();
+        //SymEnumSymbols(process_handle, 0, s!("*!*"), Some(cb), None).unwrap();
 
         //SymEnumLines(process_handle, 0, None, None, Some(cb), None).unwrap();
 
@@ -163,8 +161,7 @@ fn get_symbol_address(
     }
 }
 
-fn initialize_symbol_handler(process_handle: HANDLE, base_address: u64) -> Result<(), String> {
-    let pdb_file_path = s!(r"C:\Users\zacha\Documents\factorio\bin\x64\factorio.pdb");
+fn initialize_symbol_handler(process_handle: HANDLE) -> Result<(), String> {
     unsafe {
         SymInitialize(process_handle, PCSTR::null(), true).map_err(|e| format!("{}", e))?;
 
@@ -178,22 +175,36 @@ fn initialize_symbol_handler(process_handle: HANDLE, base_address: u64) -> Resul
             None,
         ).map_err(|e| format!("{}", e))?;*/
 
+        Ok(())
+    }
+}
+
+fn read_pdb(process_handle: HANDLE, base_address: u64) -> Result<(), String> {
+    let pdb_file_path = s!(r"C:\Users\zacha\Documents\factorio\bin\x64\factorio.pdb");
+
+    unsafe {
         let load_pdb_result = SymLoadModuleEx(
             process_handle,
             None,
             pdb_file_path,
             PSTR::null(),
             base_address,
-            0,
+            1000000,
             None,
             SYM_LOAD_FLAGS(0),
         );
-        
+
         if load_pdb_result == 0 {
             let error = GetLastError();
-            return Err(format!("Failed to load Factorio debug symbols. {:?}", error));
+            if error.0 == 0 {
+                return Ok(()) // This represents ERROR_SUCCESS aka task failed successfully.
+            } 
+            return Err(format!(
+                "Failed to load Factorio debug symbols. {:?}",
+                error
+            ));
         }
-    };
+    }
 
     Ok(())
 }
@@ -212,7 +223,7 @@ fn main() {
         }
     };
 
-    let factorio_process_information;
+    let factorio_process_information: PROCESS_INFORMATION;
 
     match start_factorio() {
         Ok(pi) => factorio_process_information = pi,
@@ -225,16 +236,18 @@ fn main() {
 
     inject_dll(&dll_path);
 
-    let base_address = get_dll_base_address("factorio", factorio_process_information).unwrap();
-    println!("Factorio base address: {:?}", base_address);
-
-    initialize_symbol_handler(process_handle, base_address).unwrap();
+    initialize_symbol_handler(process_handle).unwrap();
     println!("Factorio debug symbols loaded successfully.");
 
-    let symbol_name = s!("main"); // Mangled name
+    let base_address = get_dll_base_address(process_handle, "factorio").unwrap();
+    println!("Factorio base address: {:?}", base_address);
+
+    read_pdb(process_handle, base_address).unwrap();
+
+    let symbol_name = s!("CliffEditor::isSelectable"); // Mangled name
     let symbol_name_string = unsafe { symbol_name.to_string().unwrap() };
 
-    match get_symbol_address(factorio_process_information, symbol_name, base_address) {
+    match get_symbol_address(process_handle, symbol_name, base_address) {
         Some(address) => println!("Address of {}: {:?}", symbol_name_string, address),
         None => println!("Symbol not found"),
     }
