@@ -10,22 +10,24 @@ use std::sync::Mutex;
 use std::{collections::HashMap, ffi::c_int, fs::File, mem};
 use tracing::info;
 use windows::core::{PCSTR, PCWSTR};
-use windows::Win32::Foundation::GetLastError;
-use windows::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
+use windows::Win32::System::LibraryLoader::GetModuleHandleA;
 
 struct PDBCache {
     pdb: PDB<'static, File>,
     symbol_addresses: HashMap<String, u32>,
+    base_address: u64,
 }
 
 impl PDBCache {
-    fn new(pdb_path: &str) -> Result<Self, pdb::Error> {
+    fn new(pdb_path: &str, module_name: &str) -> Result<Self, Box<dyn Error>> {
         let file = File::open(pdb_path)?;
         let pdb = PDB::open(file)?;
+        let base_address = unsafe { get_dll_base_address(module_name)? };
 
         let mut cache = PDBCache {
             pdb,
             symbol_addresses: HashMap::new(),
+            base_address,
         };
 
         cache.build_symbol_map()?;
@@ -33,7 +35,7 @@ impl PDBCache {
         Ok(cache)
     }
 
-    fn build_symbol_map(&mut self) -> Result<(), pdb::Error> {
+    fn build_symbol_map(&mut self) -> Result<(), Box<dyn Error>> {
         let symbol_table = self.pdb.global_symbols()?;
         let address_map = self.pdb.address_map()?;
 
@@ -58,7 +60,15 @@ impl PDBCache {
         self.symbol_addresses
             .get(function_name)
             .copied()
-            .map(|x| x as u64)
+            .map(|x| self.base_address + x as u64)
+    }
+}
+
+unsafe fn get_dll_base_address(module_name: &str) -> Result<u64, Box<dyn Error>> {
+    let result = GetModuleHandleA(module_name.as_pcstr());
+    match result {
+        Ok(handle) => Ok(handle.0 as u64),
+        Err(err) => Err(err.into()),
     }
 }
 
@@ -97,37 +107,39 @@ impl AsPcstr for str {
     }
 }
 
-/// Returns a module symbol's absolute address.
-fn get_module_symbol_address(module: &str, symbol: &str) -> Result<usize, String> {
-    let handle = unsafe { GetModuleHandleW(module.as_pcwstr()) };
-    let handle = handle.map_err(|e| format!("Failed to get module handle: {}", e))?;
-
-    match unsafe { GetProcAddress(handle, symbol.as_pcstr()) } {
-        Some(func) => Ok(func as usize),
-        None => Err(format!("Failed to find function address: {:?}", unsafe {
-            GetLastError()
-        })),
-    }
-}
-
 unsafe fn hook(pdb_cache: PDBCache) -> Result<(), Box<dyn Error>> {
-    //let address = get_module_symbol_address("user32.dll", "MessageBoxW")?;
-    //info!("main address: {:#x}", address);
-    //let target: FnMain = mem::transmute(address);
-    info!("q");
-    MainHook.initialize(main, main_detour)?.enable()?;
-    info!("r");
+    let address = match pdb_cache.get_function_address("?gameUpdateLoop@MainLoop@@YA?AV?$duration@_JU?$ratio@$00$0DLJKMKAA@@std@@@chrono@std@@W4HeavyMode@1@@Z") {
+        Some(address) => address,
+        None => return Err("Failed to find main address".into()),
+    };
+
+    info!("main address: {:#x}", address);
+    let target: FnMain = mem::transmute(address);
+    MainHook.initialize(target, main_detour)?.enable()?;
     Ok(())
 }
 
 #[ctor::ctor]
 fn ctor() {
-    let stream = TcpStream::connect("127.0.55.1:16337").unwrap();
+    let ip = "127.0.0.1:40267";
+    let stream = TcpStream::connect(ip).expect(&format!(
+        "Could not establish stdout connection to rivets. Port {} is busy.",
+        ip
+    ));
     tracing_subscriber::fmt::fmt()
         .with_writer(Mutex::new(stream))
         .init();
 
-    let cache = PDBCache::new(r"C:\Users\zacha\Documents\factorio\bin\x64\factorio.pdb").unwrap();
+    let cache = match PDBCache::new(
+        r"C:\Users\zacha\Documents\factorio\bin\x64\factorio.pdb",
+        "factorio.exe",
+    ) {
+        Ok(cache) => cache,
+        Err(e) => {
+            info!("Failed to parse Factorio PDB file. {:?}", e);
+            return;
+        }
+    };
 
     let result = unsafe { hook(cache) };
     match result {

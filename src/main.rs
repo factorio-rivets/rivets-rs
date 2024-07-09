@@ -1,4 +1,5 @@
 use dll_syringe::{process::OwnedProcess, Syringe};
+use std::error::Error;
 use std::io;
 use std::net::TcpListener;
 use windows::core::{s, PCSTR, PSTR};
@@ -7,7 +8,7 @@ use windows::Win32::System::Threading::{
     CreateProcessA, ResumeThread, CREATE_SUSPENDED, PROCESS_INFORMATION, STARTUPINFOA,
 };
 
-fn inject_dll(dll_name: &str) {
+fn inject_dll(dll_name: &str) -> Result<(), Box<dyn Error>> {
     println!("Injecting DLL into Factorio process...");
     let target_process =
         OwnedProcess::find_first_by_name("factorio").expect("Failed to find Factorio process.");
@@ -15,12 +16,12 @@ fn inject_dll(dll_name: &str) {
     let option = syringe.inject(dll_name);
 
     match option {
-        Ok(_) => println!("DLL injected successfully."),
-        Err(e) => panic!("Failed to inject DLL: {}", e),
+        Ok(_) => Ok(()),
+        Err(e) => Err(format!("Failed to inject DLL: {}", e).into()),
     }
 }
 
-fn start_factorio(factorio_path: PCSTR) -> Result<PROCESS_INFORMATION, String> {
+fn start_factorio(factorio_path: PCSTR) -> Result<PROCESS_INFORMATION, Box<dyn Error>> {
     let mut startup_info: STARTUPINFOA = unsafe { std::mem::zeroed() };
     startup_info.cb = std::mem::size_of::<STARTUPINFOA>() as u32;
     let mut factorio_process_information: PROCESS_INFORMATION = unsafe { std::mem::zeroed() };
@@ -43,7 +44,7 @@ fn start_factorio(factorio_path: PCSTR) -> Result<PROCESS_INFORMATION, String> {
     };
 
     if let Err(err) = process_result {
-        return Err(format!("Failed to create Factorio process: {}", err));
+        return Err(format!("Failed to create Factorio process: {}", err).into());
     }
 
     println!("Factorio process created successfully.");
@@ -51,33 +52,18 @@ fn start_factorio(factorio_path: PCSTR) -> Result<PROCESS_INFORMATION, String> {
     Ok(factorio_process_information)
 }
 
-fn main() {
+fn execute() -> Result<(), Box<dyn Error>> {
     let dll_path = r"target\debug\examplemod.dll";
 
-    let listener = match TcpListener::bind("127.0.55.1:16337") {
-        Ok(listener) => listener,
-        Err(e) => {
-            eprintln!(
-                "Failed to copy the Factorio output logs. Is rivets already running?\n{}",
-                e
-            );
-            return;
-        }
-    };
+    let listener = TcpListener::bind("127.0.0.1:40267");
+    let listener = listener.map_err(|e| format!("Failed to copy the Factorio output logs. Is rivets already running?\n{}", e))?;
 
     let factorio_path = s!(r"C:\Users\zacha\Documents\factorio\bin\x64\factorio.exe");
-    let factorio_process_information: PROCESS_INFORMATION;
-
-    match start_factorio(factorio_path) {
-        Ok(pi) => factorio_process_information = pi,
-        Err(e) => {
-            eprintln!("{}", e);
-            return;
-        }
-    }
+    let factorio_process_information: PROCESS_INFORMATION = start_factorio(factorio_path)?;
     let process_handle = factorio_process_information.hProcess;
 
-    inject_dll(&dll_path);
+    inject_dll(&dll_path)?;
+    println!("DLL injected successfully.");
 
     unsafe {
         ResumeThread(factorio_process_information.hThread);
@@ -86,8 +72,17 @@ fn main() {
     }
 
     // Duplicate the factorio stdout stream onto our own stdout.
-    let _ = io::copy(
-        &mut listener.incoming().next().unwrap().unwrap(),
+    io::copy(
+        &mut listener.incoming().next().unwrap()?,
         &mut io::stdout(),
-    );
+    )?;
+
+    Ok(())
+}
+
+fn main() {
+    match execute() {
+        Ok(_) => {}
+        Err(e) => eprintln!("{}", e),
+    }
 }
