@@ -1,9 +1,18 @@
 #![cfg(all(windows))]
+#[allow(unreachable_code, unused_variables, unused_imports)]
 
-use ctor::ctor;
-use pdb::{Error, FallibleIterator, PDB};
-use std::{collections::HashMap, fs::File, net::TcpStream, sync::Mutex};
+use pdb::{FallibleIterator, PDB};
+use retour::static_detour;
 use tracing::info;
+use std::error::Error;
+use std::net::TcpStream;
+use std::sync::Mutex;
+use std::{
+    collections::HashMap,
+    ffi::c_int,
+    fs::File,
+    mem,
+};
 
 struct PDBCache {
     pdb: PDB<'static, File>,
@@ -11,7 +20,7 @@ struct PDBCache {
 }
 
 impl PDBCache {
-    fn new(pdb_path: &str) -> Result<Self, Error> {
+    fn new(pdb_path: &str) -> Result<Self, pdb::Error> {
         let file = File::open(pdb_path)?;
         let pdb = PDB::open(file)?;
 
@@ -25,7 +34,7 @@ impl PDBCache {
         Ok(cache)
     }
 
-    fn build_symbol_map(&mut self) -> Result<(), Error> {
+    fn build_symbol_map(&mut self) -> Result<(), pdb::Error> {
         let symbol_table = self.pdb.global_symbols()?;
         let address_map = self.pdb.address_map()?;
 
@@ -46,26 +55,56 @@ impl PDBCache {
         Ok(())
     }
 
-    pub fn get_function_address(&self, function_name: &str) -> Option<u32> {
-        self.symbol_addresses.get(function_name).copied()
+    pub fn get_function_address(&self, function_name: &str) -> Option<u64> {
+        self.symbol_addresses
+            .get(function_name)
+            .copied()
+            .map(|x| x as u64)
     }
 }
 
-#[ctor]
+static_detour! {
+    static MainHook: unsafe extern "system" fn(c_int, u32, u32) -> c_int;
+}
+
+type FnMain = unsafe extern "system" fn(c_int, u32, u32) -> c_int;
+
+fn main_detour(_argc: c_int, _argv: u32, _envp: u32) -> c_int {
+    info!("Detoured into main!");
+    //unsafe { MessageBoxWHook.call(hwnd, text, replaced_caption, msgbox_style) }
+    0.into()
+}
+
+unsafe fn main(pdb_cache: PDBCache) -> Result<(), Box<dyn Error>> {
+    let address = match pdb_cache.get_function_address("?save@Recipe@@QEBAXAEAVMapSerialiser@@@Z") {
+        Some(address) => address,
+        None => {
+            return Err("Failed to find main function address".into());
+        }
+    };
+    info!("main address: {:#x}", address);
+    let target: FnMain = mem::transmute(address);
+    info!("q");
+
+    MainHook.initialize(target, main_detour)?.enable()?;
+    info!("r");
+    Ok(())
+}
+
+#[ctor::ctor]
 fn ctor() {
     let stream = TcpStream::connect("127.0.55.1:16337").unwrap();
     tracing_subscriber::fmt::fmt()
         .with_writer(Mutex::new(stream))
         .init();
-    for _ in 0..10 {
-        info!("Hi!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    }
 
     let cache = PDBCache::new(r"C:\Users\zacha\Documents\factorio\bin\x64\factorio.pdb").unwrap();
-    info!(
-        "{}",
-        cache
-            .get_function_address("?getRemainingDistance@Train@@QEAANXZ")
-            .unwrap()
-    );
+
+    let result = unsafe { main(cache) };
+    match result {
+        Ok(_) => {}
+        Err(e) => {
+            info!("{:?}", e);
+        }
+    }
 }

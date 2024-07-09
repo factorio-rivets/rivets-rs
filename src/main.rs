@@ -86,9 +86,8 @@ fn main() {
     }
 
     // Duplicate the factorio stdout stream onto our own stdout.
-    io::copy(
+    let _ = io::copy(
         &mut listener.incoming().next().unwrap().unwrap(),
         &mut io::stdout(),
-    )
-    .unwrap();
+    );
 }
