@@ -1,18 +1,17 @@
 #![cfg(all(windows))]
-#[allow(unreachable_code, unused_variables, unused_imports)]
 
 use pdb::{FallibleIterator, PDB};
 use retour::static_detour;
-use tracing::info;
 use std::error::Error;
+use std::ffi::c_char;
+use std::iter;
 use std::net::TcpStream;
 use std::sync::Mutex;
-use std::{
-    collections::HashMap,
-    ffi::c_int,
-    fs::File,
-    mem,
-};
+use std::{collections::HashMap, ffi::c_int, fs::File, mem};
+use tracing::info;
+use windows::core::{PCSTR, PCWSTR};
+use windows::Win32::Foundation::GetLastError;
+use windows::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
 
 struct PDBCache {
     pdb: PDB<'static, File>,
@@ -64,29 +63,59 @@ impl PDBCache {
 }
 
 static_detour! {
-    static MainHook: unsafe extern "system" fn(c_int, u32, u32) -> c_int;
+    static MainHook: unsafe extern "C" fn(c_int, *const c_char, *const c_char) -> c_int;
 }
 
-type FnMain = unsafe extern "system" fn(c_int, u32, u32) -> c_int;
+type FnMain = unsafe extern "C" fn(c_int, *const c_char, *const c_char) -> c_int;
 
-fn main_detour(_argc: c_int, _argv: u32, _envp: u32) -> c_int {
+fn main_detour(_argc: c_int, _argv: *const c_char, _envp: *const c_char) -> c_int {
     info!("Detoured into main!");
     //unsafe { MessageBoxWHook.call(hwnd, text, replaced_caption, msgbox_style) }
     0.into()
 }
 
-unsafe fn main(pdb_cache: PDBCache) -> Result<(), Box<dyn Error>> {
-    let address = match pdb_cache.get_function_address("?save@Recipe@@QEBAXAEAVMapSerialiser@@@Z") {
-        Some(address) => address,
-        None => {
-            return Err("Failed to find main function address".into());
-        }
-    };
-    info!("main address: {:#x}", address);
-    let target: FnMain = mem::transmute(address);
-    info!("q");
+trait AsPcwstr {
+    fn as_pcwstr(&self) -> PCWSTR;
+}
 
-    MainHook.initialize(target, main_detour)?.enable()?;
+impl AsPcwstr for str {
+    fn as_pcwstr(&self) -> PCWSTR {
+        let utf16: Vec<u16> = self.encode_utf16().chain(iter::once(0)).collect();
+        PCWSTR(utf16.as_ptr() as _)
+    }
+}
+
+trait AsPcstr {
+    unsafe fn as_pcstr(&self) -> PCSTR;
+}
+
+impl AsPcstr for str {
+    /// This is unsafe because `PCSTR` does not implement the `Sized` trait and thus its bytes may be overwritten.
+    /// Use the `s!` macro to create a safe `PCSTR` at compile-time.
+    unsafe fn as_pcstr(&self) -> PCSTR {
+        PCSTR(format!("{}\0", self).as_ptr() as _)
+    }
+}
+
+/// Returns a module symbol's absolute address.
+fn get_module_symbol_address(module: &str, symbol: &str) -> Result<usize, String> {
+    let handle = unsafe { GetModuleHandleW(module.as_pcwstr()) };
+    let handle = handle.map_err(|e| format!("Failed to get module handle: {}", e))?;
+
+    match unsafe { GetProcAddress(handle, symbol.as_pcstr()) } {
+        Some(func) => Ok(func as usize),
+        None => Err(format!("Failed to find function address: {:?}", unsafe {
+            GetLastError()
+        })),
+    }
+}
+
+unsafe fn hook(pdb_cache: PDBCache) -> Result<(), Box<dyn Error>> {
+    //let address = get_module_symbol_address("user32.dll", "MessageBoxW")?;
+    //info!("main address: {:#x}", address);
+    //let target: FnMain = mem::transmute(address);
+    info!("q");
+    MainHook.initialize(main, main_detour)?.enable()?;
     info!("r");
     Ok(())
 }
@@ -100,7 +129,7 @@ fn ctor() {
 
     let cache = PDBCache::new(r"C:\Users\zacha\Documents\factorio\bin\x64\factorio.pdb").unwrap();
 
-    let result = unsafe { main(cache) };
+    let result = unsafe { hook(cache) };
     match result {
         Ok(_) => {}
         Err(e) => {
