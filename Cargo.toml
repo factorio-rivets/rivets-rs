@@ -12,6 +12,7 @@ dll-syringe = "=0.15.2"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 windows = { version = "0.58.0", features = ["Win32", "Win32_System", "Win32_System_Diagnostics", "Win32_System_Diagnostics_Debug", "Win32_System_LibraryLoader", "Win32_System_Threading", "Win32_Security", "Win32_System_SystemServices", "Win32_Storage", "Win32_Storage_FileSystem"] }
+pdb = "0.8.0"
 
 [lib]
 name = "examplemod"
