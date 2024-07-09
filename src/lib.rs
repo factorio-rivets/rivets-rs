@@ -1,27 +1,54 @@
 #![cfg(all(windows))]
 
-use std::{fs::File, net::TcpStream, sync::Mutex};
-use tracing::info;
 use ctor::ctor;
+use pdb::{Error, FallibleIterator, PDB};
+use std::{collections::HashMap, fs::File, net::TcpStream, sync::Mutex};
+use tracing::info;
 
-fn x() -> pdb::Result<()> {
-    let pdb_path = r"C:\Users\zacha\Documents\factorio\bin\x64\factorio.pdb";
-    let file = File::open(pdb_path)?;
-    let mut pdb = pdb::PDB::open(file)?;
-    let symbol_table = pdb.global_symbols()?;
-    let address_map = pdb.address_map()?;
+struct PDBCache {
+    pdb: PDB<'static, File>,
+    symbol_addresses: HashMap<String, u32>,
+}
 
-    let mut symbols = symbol_table.iter();
-    let _ = symbols.for_each(|symbol| match symbol.parse() {
-        Ok(pdb::SymbolData::Public(data)) if data.function => Ok({
-            // we found the location of a function!
-            let rva = data.offset.to_rva(&address_map).unwrap_or_default();
-            println!("{} is {}", rva, data.name);
-        }),
-        _ => Ok(()),
-    });
+impl PDBCache {
+    fn new(pdb_path: &str) -> Result<Self, Error> {
+        let file = File::open(pdb_path)?;
+        let pdb = PDB::open(file)?;
 
-    Ok(())
+        let mut cache = PDBCache {
+            pdb,
+            symbol_addresses: HashMap::new(),
+        };
+
+        cache.build_symbol_map()?;
+
+        Ok(cache)
+    }
+
+    fn build_symbol_map(&mut self) -> Result<(), Error> {
+        let symbol_table = self.pdb.global_symbols()?;
+        let address_map = self.pdb.address_map()?;
+
+        symbol_table.iter().for_each(|symbol| {
+            match symbol.parse() {
+                Ok(pdb::SymbolData::Public(data)) if data.function => {
+                    let rva = data.offset.to_rva(&address_map).unwrap_or_default();
+                    self.symbol_addresses
+                        .insert(data.name.to_string().into(), rva.0);
+                }
+                Err(e) => return Err(e),
+                _ => {}
+            };
+
+            Ok(())
+        })?;
+
+        Ok(())
+    }
+
+    pub fn get_function_address(&self, function_name: &str) -> Option<u32> {
+        self.symbol_addresses.get(function_name).copied()
+    }
 }
 
 #[ctor]
@@ -33,6 +60,12 @@ fn ctor() {
     for _ in 0..10 {
         info!("Hi!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     }
-    
-    x();
+
+    let cache = PDBCache::new(r"C:\Users\zacha\Documents\factorio\bin\x64\factorio.pdb").unwrap();
+    info!(
+        "{}",
+        cache
+            .get_function_address("?getRemainingDistance@Train@@QEAANXZ")
+            .unwrap()
+    );
 }

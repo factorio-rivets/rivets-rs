@@ -1,23 +1,11 @@
 use dll_syringe::{process::OwnedProcess, Syringe};
 use std::io;
 use std::net::TcpListener;
-use windows::core::{PCSTR, PSTR};
+use windows::core::{s, PCSTR, PSTR};
 use windows::Win32::Foundation::CloseHandle;
-use windows::Win32::System::LibraryLoader::GetModuleHandleA;
 use windows::Win32::System::Threading::{
     CreateProcessA, ResumeThread, CREATE_SUSPENDED, PROCESS_INFORMATION, STARTUPINFOA,
 };
-
-trait AsPcstr {
-    fn as_pcstr(&self) -> PCSTR;
-}
-
-impl AsPcstr for &str {
-    fn as_pcstr(&self) -> PCSTR {
-        let null_terminated = format!("{}\0", self);
-        PCSTR::from_raw(null_terminated.as_ptr())
-    }
-}
 
 fn inject_dll(dll_name: &str) {
     println!("Injecting DLL into Factorio process...");
@@ -32,7 +20,7 @@ fn inject_dll(dll_name: &str) {
     }
 }
 
-fn start_factorio(factorio_path: &str) -> Result<PROCESS_INFORMATION, String> {
+fn start_factorio(factorio_path: PCSTR) -> Result<PROCESS_INFORMATION, String> {
     let mut startup_info: STARTUPINFOA = unsafe { std::mem::zeroed() };
     startup_info.cb = std::mem::size_of::<STARTUPINFOA>() as u32;
     let mut factorio_process_information: PROCESS_INFORMATION = unsafe { std::mem::zeroed() };
@@ -41,7 +29,7 @@ fn start_factorio(factorio_path: &str) -> Result<PROCESS_INFORMATION, String> {
     println!("Creating factorio.exe process...");
     let process_result = unsafe {
         CreateProcessA(
-            factorio_path.as_pcstr(),
+            factorio_path,
             PSTR::null(),
             None,
             None,
@@ -63,14 +51,6 @@ fn start_factorio(factorio_path: &str) -> Result<PROCESS_INFORMATION, String> {
     Ok(factorio_process_information)
 }
 
-unsafe fn get_dll_base_address(module_name: &str) -> Result<u64, String> {
-    let result = GetModuleHandleA(module_name.as_pcstr());
-    match result {
-        Ok(handle) => Ok(handle.0 as u64),
-        Err(err) => Err(format!("{}", err)),
-    }
-}
-
 fn main() {
     let dll_path = r"target\debug\examplemod.dll";
 
@@ -85,7 +65,7 @@ fn main() {
         }
     };
 
-    let factorio_path = r"C:\Users\zacha\Documents\factorio\bin\x64\factorio.exe";
+    let factorio_path = s!(r"C:\Users\zacha\Documents\factorio\bin\x64\factorio.exe");
     let factorio_process_information: PROCESS_INFORMATION;
 
     match start_factorio(factorio_path) {
@@ -98,9 +78,6 @@ fn main() {
     let process_handle = factorio_process_information.hProcess;
 
     inject_dll(&dll_path);
-
-    let base_address = unsafe { get_dll_base_address("factorio.exe") }.unwrap();
-    println!("Factorio base address: {:?}", base_address);
 
     unsafe {
         ResumeThread(factorio_process_information.hThread);
