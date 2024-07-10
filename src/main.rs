@@ -1,3 +1,4 @@
+use anyhow::{anyhow, bail, Result};
 use dll_syringe::{process::OwnedProcess, Syringe};
 use std::io;
 use std::net::TcpListener;
@@ -6,7 +7,6 @@ use windows::Win32::Foundation::CloseHandle;
 use windows::Win32::System::Threading::{
     CreateProcessA, ResumeThread, CREATE_SUSPENDED, PROCESS_INFORMATION, STARTUPINFOA,
 };
-use anyhow::{bail, anyhow, Result};
 
 fn inject_dll(dll_name: &str) -> Result<()> {
     println!("Injecting DLL into Factorio process...");
@@ -73,7 +73,13 @@ fn main() -> Result<()> {
 
     // Duplicate the factorio stdout stream onto our own stdout.
     #[allow(clippy::expect_used)]
-    io::copy(&mut listener.incoming().next().expect("Factorio will always have stdout.")?, &mut io::stdout())?;
+    io::copy(
+        &mut listener
+            .incoming()
+            .next()
+            .expect("Factorio will always have stdout.")?,
+        &mut io::stdout(),
+    )?;
 
     Ok(())
 }

@@ -1,6 +1,6 @@
+use anyhow::{bail, Result};
 use pdb::{FallibleIterator, PDB};
 use retour::static_detour;
-use std::error::Error;
 use std::ffi::c_char;
 use std::iter;
 use std::net::TcpStream;
@@ -17,7 +17,7 @@ struct PDBCache {
 }
 
 impl PDBCache {
-    fn new(pdb_path: &str, module_name: &str) -> Result<Self, Box<dyn Error>> {
+    fn new(pdb_path: &str, module_name: &str) -> Result<Self> {
         let file = File::open(pdb_path)?;
         let pdb = PDB::open(file)?;
         let base_address = unsafe { get_dll_base_address(module_name)? };
@@ -29,28 +29,27 @@ impl PDBCache {
         };
 
         cache.build_symbol_map()?;
-        //cache.print_structs()?;
+        cache.print_structs()?;
 
         Ok(cache)
     }
 
-    fn build_symbol_map(&mut self) -> Result<(), Box<dyn Error>> {
+    fn build_symbol_map(&mut self) -> Result<()> {
         let symbol_table = self.pdb.global_symbols()?;
         let address_map = self.pdb.address_map()?;
 
-        symbol_table.iter().for_each(|symbol| {
-            match symbol.parse() {
+        symbol_table
+            .iter()
+            .for_each(|symbol| match symbol.parse() {
                 Ok(pdb::SymbolData::Public(data)) if data.function => {
                     let rva = data.offset.to_rva(&address_map).unwrap_or_default();
                     self.symbol_addresses
                         .insert(data.name.to_string().into(), rva.0);
+                    Ok(())
                 }
-                Err(e) => return Err(e),
-                _ => {}
-            };
-
-            Ok(())
-        })?;
+                Err(e) => Err(e),
+                _ => Ok(()),
+            })?;
 
         Ok(())
     }
@@ -62,76 +61,76 @@ impl PDBCache {
             .map(|x| self.base_address + u64::from(x))
     }
 
-    pub fn print_structs(&mut self) -> Result<(), Box<dyn Error>> {
+    pub fn print_structs(&mut self) -> Result<()> {
         let symbol_table = self.pdb.type_information()?;
         info!("Symbol table:");
         symbol_table.iter().for_each(|symbol| {
             match symbol.parse() {
                 Ok(pdb::TypeData::Primitive(data)) => {
-                    info!("{:?}", data)
+                    info!("{:?}", data);
                 }
                 Ok(pdb::TypeData::Class(data)) => {
-                    info!("{:?}", data)
+                    info!("{:?}", data);
                 }
                 Ok(pdb::TypeData::Member(data)) => {
-                    info!("{:?}", data)
+                    info!("{:?}", data);
                 }
                 Ok(pdb::TypeData::MemberFunction(data)) => {
-                    info!("{:?}", data)
+                    info!("{:?}", data);
                 }
                 Ok(pdb::TypeData::OverloadedMethod(data)) => {
-                    info!("{:?}", data)
+                    info!("{:?}", data);
                 }
                 Ok(pdb::TypeData::Method(data)) => {
-                    info!("{:?}", data)
+                    info!("{:?}", data);
                 }
                 Ok(pdb::TypeData::StaticMember(data)) => {
-                    info!("{:?}", data)
+                    info!("{:?}", data);
                 }
                 Ok(pdb::TypeData::Nested(data)) => {
-                    info!("{:?}", data)
+                    info!("{:?}", data);
                 }
                 Ok(pdb::TypeData::BaseClass(data)) => {
-                    info!("{:?}", data)
+                    info!("{:?}", data);
                 }
                 Ok(pdb::TypeData::VirtualBaseClass(data)) => {
-                    info!("{:?}", data)
+                    info!("{:?}", data);
                 }
                 Ok(pdb::TypeData::VirtualFunctionTablePointer(data)) => {
-                    info!("{:?}", data)
+                    info!("{:?}", data);
                 }
                 Ok(pdb::TypeData::Procedure(data)) => {
-                    info!("{:?}", data)
+                    info!("{:?}", data);
                 }
                 Ok(pdb::TypeData::Pointer(data)) => {
-                    info!("{:?}", data)
+                    info!("{:?}", data);
                 }
                 Ok(pdb::TypeData::Modifier(data)) => {
-                    info!("{:?}", data)
+                    info!("{:?}", data);
                 }
                 Ok(pdb::TypeData::Enumeration(data)) => {
-                    info!("{:?}", data)
+                    info!("{:?}", data);
                 }
                 Ok(pdb::TypeData::Enumerate(data)) => {
-                    info!("{:?}", data)
+                    info!("{:?}", data);
                 }
                 Ok(pdb::TypeData::Array(data)) => {
-                    info!("{:?}", data)
+                    info!("{:?}", data);
                 }
                 Ok(pdb::TypeData::Union(data)) => {
-                    info!("{:?}", data)
+                    info!("{:?}", data);
                 }
                 Ok(pdb::TypeData::Bitfield(data)) => {
-                    info!("{:?}", data)
+                    info!("{:?}", data);
                 }
                 Ok(pdb::TypeData::FieldList(data)) => {
-                    info!("{:?}", data)
+                    info!("{:?}", data);
                 }
                 Ok(pdb::TypeData::ArgumentList(data)) => {
-                    info!("{:?}", data)
+                    info!("{:?}", data);
                 }
                 Ok(pdb::TypeData::MethodList(data)) => {
-                    info!("{:?}", data)
+                    info!("{:?}", data);
                 }
                 Err(e) => return Err(e),
                 _ => {}
@@ -144,11 +143,11 @@ impl PDBCache {
     }
 }
 
-unsafe fn get_dll_base_address(module_name: &str) -> Result<u64, Box<dyn Error>> {
+unsafe fn get_dll_base_address(module_name: &str) -> Result<u64> {
     let result = GetModuleHandleA(module_name.as_pcstr());
     match result {
         Ok(handle) => Ok(handle.0 as u64),
-        Err(err) => Err(err.into()),
+        Err(err) => bail!(err),
     }
 }
 
@@ -187,11 +186,11 @@ impl AsPcstr for str {
     }
 }
 
-unsafe fn hook(pdb_cache: &PDBCache) -> Result<(), Box<dyn Error>> {
+unsafe fn hook(pdb_cache: &PDBCache) -> Result<()> {
     let function_name = "?valid@LuaSurface@@UEBA_NXZ";
 
     let Some(address) = pdb_cache.get_function_address(function_name) else {
-        return Err("Failed to find main address".into());
+        bail!("Failed to find main address");
     };
 
     info!("{} address: {:#x}", function_name, address);
@@ -203,10 +202,9 @@ unsafe fn hook(pdb_cache: &PDBCache) -> Result<(), Box<dyn Error>> {
 #[ctor::ctor]
 fn ctor() {
     let ip = "127.0.0.1:40267";
-    #[allow(clippy::expect_used, clippy::expect_fun_call)]
-    let stream = TcpStream::connect(ip).expect(&format!(
-        "Could not establish stdout connection to rivets. Port {ip} is busy."
-    ));
+    let stream = TcpStream::connect(ip).unwrap_or_else(|_| {
+        panic!("Could not establish stdout connection to rivets. Port {ip} is busy.")
+    });
     tracing_subscriber::fmt::fmt()
         .with_writer(Mutex::new(stream))
         .init();
