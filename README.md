@@ -1,43 +1,29 @@
-# Rivets
+# Rivets 🔩
 
-Welcome to the Rivets, a Factorio DLL Injector written in rust! Rivets injects code into the Factorio binary via DLL injection, providing a powerful toolset for modding and enhancing the game.
-Currently, our injector supports Windows, but we welcome contributions for Unix support.
+Welcome to the Rivets, a Factorio modding written in Rust! Rivets injects code into the Factorio binary via DLL injection, providing a powerful toolset for modding and enhancing the game.
 
 ## Features
 
-- **DLL Injection**: Seamlessly inject your custom code into the Factorio binary.
-- **Procedural Macros**: Utilize elegant proc macros to overwrite or detour functions with ease.
+- **Procedural Macros**: Utilize idiomatic proc macros to overwrite or detour compiled Factorio functions.
 
-## Installation
-
-1. **Clone the repository**:
-    ```sh
-    git clone https://github.com/notnotmelon/rivets.git
-    cd rivets
-    ```
-
-2. **Build the project**:
-    ```sh
-    cargo build --release
-    ```
-
-3. **Inject the DLL**:
-    Follow the instructions in the [Usage](#usage) section to inject your custom DLL into Factorio.
-
-## Usage
-
-### Detour Example
-
-With the provided procedural macros, you can easily detour functions. Here is an example of how to detour the `main` function:
-
+Here is an example of how to detour the `main` function:
 ```rust
 #[detour(main)]
-fn main_detour(_argc: c_int, _argv: *const c_char, _envp: *const c_char) {
-    info!("Detoured into main!");
+fn main(argc: c_int, argv: *const c_char, envp: *const c_char) {
+    info!("Detoured into main! 🦀🔩");
 }
 ```
+This will intercept the `main` function call and execute your custom logic, allowing you to modify the behavior of the game.
 
-This will intercept the `main` function call and execute your custom logic, allowing you to modify the behavior of the game seamlessly.
+- **Seamless interop with Factorio Lua**: Mods written with Rivets can easily subscribe to lua events, and call `remote` API's to share data with Factorio mods written in Lua.
+
+```rust
+#[on_event(defines::events::on_player_died)]
+fn on_player_died(player_index: u32, cause: LuaEntity) {
+    let player: LuaPlayer = game.get_player(player_index);
+    player.print("You just lost the game 💀");
+}
+```
 
 ## Contributing
 
@@ -53,19 +39,28 @@ We are actively seeking contributors to help expand this project, particularly f
 6. **Open a pull request**
 
 We welcome contributions of all kinds, including bug fixes, new features, documentation improvements, and more.
+See our open [ISSUES](https://github.com/notnotmelon/rivets/issues) if you are interested in becoming a contributor.
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under a custom license. See the [LICENSE](https://github.com/notnotmelon/rivets?tab=License-1-ov-file) file for details.
+Any mods released using Rivets must have freely avalible source code.
+
+```
+1. Any modifications, adaptations, or derivative works (collectively "Mods")
+   developed using the Software must be released under an open-source license
+   as defined by the Open Source Initiative (OSI) (https://opensource.org/osd).
+```
 
 ## Contact
 
-For any questions or support, please open an issue on GitHub or contact us directly.
-
-Happy modding!
+For any questions or support, please open an issue on GitHub or use GitHub discussions.
+We also have a community on [Discord](https://discord.gg/SBHM3h5Utj).
 
 ---
 
 _This project is not affiliated with or endorsed by the developers of Factorio._
 
 ---
+
+Happy modding!
