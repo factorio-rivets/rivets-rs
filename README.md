@@ -1,6 +1,13 @@
 # Rivets 🔩
 
-Welcome to the Rivets, a Factorio modding written in Rust! Rivets injects code into the Factorio binary via DLL injection, providing a powerful toolset for modding and enhancing the game.
+Welcome to the Rivets, a Factorio mod loader written in Rust! Rivets injects code into the Factorio binary via DLL injection, providing a powerful toolset for modding and enhancing the game.
+
+Mods written in Rivets have access to functionality not possible within the traditional Lua API.
+- Directly modifiy functionality in the compiled Factorio executable.
+- Add new prototypes such as [LinkedRail](https://mods.factorio.com/mod/linked-rail).
+- Access to a huge library of crates via the Rust [package manager](https://crates.io/).
+- Go blazingly fast with Rust memory safety guarantees and multithreading.
+- A superset of all the functionality possible within the vanilla Lua scripting language.
 
 ## Features
 
@@ -25,6 +32,8 @@ fn on_player_died(player_index: u32, cause: LuaEntity) {
 }
 ```
 
+- **Leverage existing modding infrastructure**: Rivets' design goal is to not reinvent the wheel. Mods written in Rust can be hosted on the offical Factorio modding website. Rivets is also designed to easily allow both Lua and Rust in the same Factorio mod.
+
 ## Contributing
 
 We are actively seeking contributors to help expand this project, particularly for adding Unix support. If you're interested in contributing, please fork the repository and submit a pull request. 
@@ -40,6 +49,14 @@ We are actively seeking contributors to help expand this project, particularly f
 
 We welcome contributions of all kinds, including bug fixes, new features, documentation improvements, and more.
 See our open [ISSUES](https://github.com/notnotmelon/rivets/issues) if you are interested in becoming a contributor.
+
+## Credits
+
+A huge thank-you to the following crates, without which this project would not be possible.
+- [Retour](https://crates.io/crates/retour) - Allows directly modifying Factorio's ASM to detour functions.
+- [DLL Syringe](https://crates.io/crates/dll-syringe) - Injects .DLL files into the Factorio executable.
+- [PDB](https://crates.io/crates/pdb) - Used to parse the .PDB file format and allows debug symbols to be read on Windows.
+- [Gimli](https://crates.io/crates/gimli) - Used to parse the .DWARF file format and allows debug symbols to be read on *nix systems.
 
 ## License
 
