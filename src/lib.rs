@@ -228,7 +228,7 @@ fn ctor() {
         .init();
 
     let cache = match PDBCache::new(
-        r"C:\Users\zacha\Documents\factorio\bin\x64\factorio.pdb",
+        r"%userprofile%\Documents\factorio\bin\x64\factorio.pdb",
         "factorio.exe",
     ) {
         Ok(cache) => cache,
