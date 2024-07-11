@@ -14,6 +14,8 @@ tracing-subscriber = "0.3.18"
 windows = { version = "0.58.0", features = ["Win32", "Win32_System", "Win32_System_LibraryLoader", "Win32_System_Threading", "Win32_Security"] }
 pdb = "0.8.0"
 anyhow = "1.0.86"
+getopts = "0.2.21"
+bindgen = "0.69.4"
 
 [lints.clippy]
 nursery = { level = "warn", priority = -1 }

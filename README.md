@@ -1,5 +1,3 @@
-# Rivets 🔩
-
 <div align="center">
     <a href="https://github.com/notnotmelon/rivets">
     <picture>
@@ -13,6 +11,8 @@
 [![](https://img.shields.io/badge/License-Rivets_2024-green)](https://github.com/notnotmelon/rivets/blob/master/LICENSE.md)
 
 </div>
+
+# Rivets 🔩
 
 Welcome to Rivets, a Factorio mod loader written in Rust! Rivets injects code into the Factorio binary via DLL injection, providing a powerful toolset for modding and enhancing the game.
 
@@ -71,6 +71,7 @@ A huge thank-you to the following crates, without which this project would not b
 - [DLL Syringe](https://crates.io/crates/dll-syringe) - Injects .DLL files into the Factorio executable.
 - [PDB](https://crates.io/crates/pdb) - Used to parse the .PDB file format and allows debug symbols to be read on Windows.
 - [Gimli](https://crates.io/crates/gimli) - Used to parse the .DWARF file format and allows debug symbols to be read on *nix systems.
+- [Bindgen](https://crates.io/crates/bindgen) - Automatically generates Rust bindings for Factorio datatypes defined in the .pdb
 
 ## License
 

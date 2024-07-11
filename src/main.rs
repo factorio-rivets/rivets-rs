@@ -8,7 +8,8 @@ use windows::Win32::System::Threading::{
     CreateProcessA, ResumeThread, CREATE_SUSPENDED, PROCESS_INFORMATION, STARTUPINFOA,
 };
 
-mod structs;
+mod luastate;
+mod bindings;
 
 fn inject_dll(dll_name: &str) -> Result<()> {
     println!("Injecting DLL into Factorio process...");
@@ -52,7 +53,7 @@ fn start_factorio(factorio_path: PCSTR) -> Result<PROCESS_INFORMATION> {
     Ok(factorio_process_information)
 }
 
-fn main() -> Result<()> {
+fn inject() -> Result<()> {
     let dll_path = r"target\debug\examplemod.dll";
 
     let listener = TcpListener::bind("127.0.0.1:40267");
@@ -82,6 +83,18 @@ fn main() -> Result<()> {
             .expect("Factorio will always have stdout.")?,
         &mut io::stdout(),
     )?;
+
+    Ok(())
+}
+
+fn main() -> Result<()> {
+    let pdb_path = r"C:\Users\zacha\Documents\factorio\bin\x64\factorio.pdb";
+    
+    if std::env::args().any(|x| x == *"bindings") {
+        bindings::generate(pdb_path)?;
+    } else {
+        inject()?;
+    }
 
     Ok(())
 }
