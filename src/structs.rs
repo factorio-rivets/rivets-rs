@@ -14,7 +14,7 @@ type luai_jmpbuf = c_int;
 type lu_mem = size_t;
 type l_mem = ptrdiff_t;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct GCheader {
   previous: *mut GCObject,
@@ -23,7 +23,7 @@ struct GCheader {
   marked: lu_byte
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 union L_Umaxalign {
   u: c_double,
@@ -31,14 +31,14 @@ union L_Umaxalign {
   l: c_longlong,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 union TString {
   dummy: L_Umaxalign,
   tsv: TStringInner,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct TStringInner {
   // common header
@@ -53,14 +53,14 @@ struct TStringInner {
   len: size_t
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 union Udata {
   dummy: L_Umaxalign,
   uv: UdataInner,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct UdataInner {
   // common header
@@ -75,7 +75,7 @@ struct UdataInner {
   len: c_ulong, // c_size_t is nightly only, defaults to usize currently -> 64 bit
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct Table {
   // common header
@@ -99,7 +99,7 @@ struct Table {
   customdata: *mut c_void,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct TValue {
   value_: Value,
@@ -108,7 +108,7 @@ struct TValue {
 
 type StkId = *mut TValue;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 union Value {
   gc: *mut GCObject,
@@ -118,14 +118,14 @@ union Value {
   n: lua_Number,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 union TKey {
   nk: TKeyInner,
   tvk: TValue,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct TKeyInner {
   value_: Value,
@@ -133,7 +133,7 @@ struct TKeyInner {
   next: *mut Node,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct Node {
   i_val: TValue,
@@ -142,7 +142,7 @@ struct Node {
   prev: *mut Node,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct CClosure {
   // closure header
@@ -160,7 +160,7 @@ struct CClosure {
   upvalue: [TValue; 1],
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct LClosure {
   // closure header
@@ -178,14 +178,14 @@ struct LClosure {
   upvals: *mut [UpVal; 1],
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 union Closure {
   c: CClosure,
   l: LClosure,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 union GCObject {
   gch: GCheader,
@@ -194,7 +194,7 @@ union GCObject {
   cl: Closure,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct Proto {
   // common header
@@ -226,7 +226,7 @@ struct Proto {
   maxstacksize: lu_byte,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct UpVal {
   // common header
@@ -240,21 +240,21 @@ struct UpVal {
   u: UpValInternal,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 union UpValInternal {
   value: TValue,
   l: UpValInternalInternal,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct UpValInternalInternal {
   prev: *mut UpVal,
   next: *mut UpVal,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct LocVar {
   varname: *mut TString,
@@ -262,7 +262,7 @@ struct LocVar {
   endpc: c_int,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct Upvaldesc {
   name: *mut TString,
@@ -270,7 +270,7 @@ struct Upvaldesc {
   idx: lu_byte,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct CallInfo {
   func: StkId,  /* function index in the stack */
@@ -283,21 +283,21 @@ struct CallInfo {
   u: CallInfoInternal,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 union CallInfoInternal {
   l: CallInfoInternalL,
   c: CallInfoInternalC,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct CallInfoInternalL {
   base: StkId,
   savedpc: *const Instruction,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct CallInfoInternalC {
   ctx: c_int,
@@ -307,7 +307,7 @@ struct CallInfoInternalC {
   status: lu_byte,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct lua_longjmp {
   previous: *mut lua_longjmp,
@@ -315,7 +315,7 @@ struct lua_longjmp {
   status: c_int,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct lua_State {
   // common header
@@ -348,7 +348,7 @@ struct lua_State {
   userData2: *mut c_void, /* custom user-data pointer */
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct Mbuffer {
   buffer: *mut c_char,
@@ -356,7 +356,7 @@ struct Mbuffer {
   buffsize: size_t,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct stringtable {
   hash: *mut *mut GCObject,
@@ -367,7 +367,7 @@ struct stringtable {
 const TM_N: usize = 17; // count of variants in this enum (excluding the last one) https://github.com/Rseding91/Factorio-Lua/blob/ce12474c7fcee694bde1aa0f668dce488aca0806/src/ltm.h#L18
 const LUA_NUMTAGS: usize = 9;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct global_State {
   frealloc: lua_Alloc,
@@ -410,7 +410,7 @@ struct global_State {
 
 const LUA_IDSIZE: usize = 60;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct lua_Debug {
   event: c_int,

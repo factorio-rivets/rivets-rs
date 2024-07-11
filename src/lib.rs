@@ -1,12 +1,12 @@
 use anyhow::{bail, Result};
-use pdb::{FallibleIterator, PDB};
+use pdb::{FallibleIterator, TypeIndex, PDB};
 use retour::static_detour;
 use std::ffi::c_char;
 use std::iter;
 use std::net::TcpStream;
 use std::sync::Mutex;
 use std::{collections::HashMap, ffi::c_int, fs::File, mem};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use windows::core::{PCSTR, PCWSTR};
 use windows::Win32::System::LibraryLoader::GetModuleHandleA;
 
@@ -62,82 +62,111 @@ impl PDBCache {
     }
 
     pub fn print_structs(&mut self) -> Result<()> {
+        /*
+            2024-07-11T05:24:15.380140Z  INFO examplemod: Class count: 124843
+            2024-07-11T05:24:15.380303Z  INFO examplemod: Member function count: 1
+            2024-07-11T05:24:15.380362Z  INFO examplemod: Procedure count: 65550
+            2024-07-11T05:24:15.380413Z  INFO examplemod: Pointer count: 177468
+            2024-07-11T05:24:15.380457Z  INFO examplemod: Modifier count: 39642
+            2024-07-11T05:24:15.380523Z  INFO examplemod: Enumeration count: 4752
+            2024-07-11T05:24:15.380602Z  INFO examplemod: Array count: 1731
+            2024-07-11T05:24:15.380673Z  INFO examplemod: Union count: 1010
+            2024-07-11T05:24:15.380715Z  INFO examplemod: Bitfield count: 216
+            2024-07-11T05:24:15.380758Z  INFO examplemod: Field list count: 57236
+            2024-07-11T05:24:15.380802Z  INFO examplemod: Argument list count: 193345
+            2024-07-11T05:24:15.380844Z  INFO examplemod: Method list count: 86779
+         */
+        
         let symbol_table = self.pdb.type_information()?;
         info!("Symbol table:");
+        let mut class_count: u64 = 0;
+        let mut member_function_count: u64 = 0;
+        let mut procedure_count: u64 = 0;
+        let mut pointer_count: u64 = 0;
+        let mut modifier_count: u64 = 0;
+        let mut enumeration_count: u64 = 0;
+        let mut array_count: u64 = 0;
+        let mut union_count: u64 = 0;
+        let mut bitfield_count: u64 = 0;
+        let mut field_list_count: u64 = 0;
+        let mut argument_list_count: u64 = 0;
+        let mut method_list_count: u64 = 0;
+
+        let mut finder: pdb::ItemFinder<TypeIndex> = symbol_table.finder();
+        let mut type_iter = type_information.iter();
+            while let Some(typ) = type_information.item()? {
+                // keep building the index
+                type_finder.update(&type_iter);
+            }
+
         symbol_table.iter().for_each(|symbol| {
             match symbol.parse() {
-                Ok(pdb::TypeData::Primitive(data)) => {
-                    info!("{:?}", data);
-                }
                 Ok(pdb::TypeData::Class(data)) => {
-                    info!("{:?}", data);
-                }
-                Ok(pdb::TypeData::Member(data)) => {
-                    info!("{:?}", data);
-                }
-                Ok(pdb::TypeData::MemberFunction(data)) => {
-                    info!("{:?}", data);
-                }
-                Ok(pdb::TypeData::OverloadedMethod(data)) => {
-                    info!("{:?}", data);
-                }
-                Ok(pdb::TypeData::Method(data)) => {
-                    info!("{:?}", data);
-                }
-                Ok(pdb::TypeData::StaticMember(data)) => {
-                    info!("{:?}", data);
-                }
-                Ok(pdb::TypeData::Nested(data)) => {
-                    info!("{:?}", data);
-                }
-                Ok(pdb::TypeData::BaseClass(data)) => {
-                    info!("{:?}", data);
-                }
-                Ok(pdb::TypeData::VirtualBaseClass(data)) => {
-                    info!("{:?}", data);
-                }
-                Ok(pdb::TypeData::VirtualFunctionTablePointer(data)) => {
-                    info!("{:?}", data);
-                }
-                Ok(pdb::TypeData::Procedure(data)) => {
-                    info!("{:?}", data);
-                }
-                Ok(pdb::TypeData::Pointer(data)) => {
-                    info!("{:?}", data);
-                }
-                Ok(pdb::TypeData::Modifier(data)) => {
-                    info!("{:?}", data);
-                }
-                Ok(pdb::TypeData::Enumeration(data)) => {
-                    info!("{:?}", data);
-                }
-                Ok(pdb::TypeData::Enumerate(data)) => {
-                    info!("{:?}", data);
-                }
-                Ok(pdb::TypeData::Array(data)) => {
-                    info!("{:?}", data);
-                }
-                Ok(pdb::TypeData::Union(data)) => {
-                    info!("{:?}", data);
-                }
-                Ok(pdb::TypeData::Bitfield(data)) => {
-                    info!("{:?}", data);
-                }
-                Ok(pdb::TypeData::FieldList(data)) => {
-                    info!("{:?}", data);
-                }
-                Ok(pdb::TypeData::ArgumentList(data)) => {
-                    info!("{:?}", data);
-                }
-                Ok(pdb::TypeData::MethodList(data)) => {
-                    info!("{:?}", data);
-                }
-                Err(e) => return Err(e),
+                    if class_count % 1000 == 0 {
+                        info!("{}", data.name);
+                        let Some(field_index) = data.fields else {
+                            warn!("No fields found for class {}", data.name);
+                            return Ok(())
+                        };
+                        let fields: pdb::Item<TypeIndex> = finder.find(field_index)?;
+                        info!("q");
+                        let field_data: pdb::TypeData = fields.parse()?; // Failed to parse Factorio PDB file. Type 4152 not indexed (index covers 4103)
+                        info!("{field_data:?}");
+                    }
+                    class_count += 1;
+                },
+                Ok(pdb::TypeData::MemberFunction(_)) => {
+                    member_function_count= 1;
+                },
+                Ok(pdb::TypeData::Procedure(_)) => {
+                    procedure_count += 1;
+                },
+                Ok(pdb::TypeData::Pointer(_)) => {
+                    pointer_count += 1;
+                },
+                Ok(pdb::TypeData::Modifier(_)) => {
+                    modifier_count += 1;
+                },
+                Ok(pdb::TypeData::Enumeration(_)) => {
+                    enumeration_count += 1;
+                },
+                Ok(pdb::TypeData::Array(_)) => {
+                    array_count += 1;
+                },
+                Ok(pdb::TypeData::Union(_)) => {
+                    union_count += 1;
+                },
+                Ok(pdb::TypeData::Bitfield(_)) => {
+                    bitfield_count += 1;
+                },
+                Ok(pdb::TypeData::FieldList(_)) => {
+                    field_list_count += 1;
+                },
+                Ok(pdb::TypeData::ArgumentList(_)) => {
+                    argument_list_count += 1;
+                },
+                Ok(pdb::TypeData::MethodList(_)) => {
+                    method_list_count += 1;
+                },
                 _ => {}
             };
-
             Ok(())
         })?;
+
+        let justify: usize = 16;
+        info!("Class count: {class_count:>justify$}");
+        info!("Member function count: {member_function_count:>justify$}");
+        info!("Procedure count: {procedure_count:>justify$}");
+        info!("Pointer count: {pointer_count:>justify$}");
+        info!("Modifier count: {modifier_count:>justify$}");
+        info!("Enumeration count: {enumeration_count:>justify$}");
+        info!("Array count: {array_count:>justify$}");
+        info!("Union count: {union_count:>justify$}");
+        info!("Bitfield count: {bitfield_count:>justify$}");
+        info!("Field list count: {field_list_count:>justify$}");
+        info!("Argument list count: {argument_list_count:>justify$}");
+        info!("Method list count: {method_list_count:>justify$}");
+        
 
         Ok(())
     }
@@ -161,17 +190,6 @@ fn main_detour(_argc: c_int, _argv: *const c_char, _envp: *const c_char) -> bool
     info!("Detoured into main!");
     //unsafe { MessageBoxWHook.call(hwnd, text, replaced_caption, msgbox_style) }
     false
-}
-
-trait AsPcwstr {
-    fn as_pcwstr(&self) -> PCWSTR;
-}
-
-impl AsPcwstr for str {
-    fn as_pcwstr(&self) -> PCWSTR {
-        let utf16: Vec<u16> = self.encode_utf16().chain(iter::once(0)).collect();
-        PCWSTR(utf16.as_ptr().cast())
-    }
 }
 
 trait AsPcstr {
