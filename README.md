@@ -1,6 +1,20 @@
 # Rivets 🔩
 
-Welcome to the Rivets, a Factorio mod loader written in Rust! Rivets injects code into the Factorio binary via DLL injection, providing a powerful toolset for modding and enhancing the game.
+<div align="center">
+    <a href="https://github.com/notnotmelon/rivets">
+    <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="https://forums.factorio.com/images/ext/20b0f93fa0933e4aa7df8592f124d153.png">
+        <img alt="Rivets 🔩 - the Factorio mod loader" width="75%" style="max-width: 600px" src=".github/assets/logo-horizontal.png">
+    </picture>
+    </a>
+
+[![Discord](https://img.shields.io/discord/1260754935952314418?color=lightblue&label=Community%20Chat&logo=Discord&logoColor=aqua)](https://discord.gg/xRYEZYz5WR)
+![Downloads](https://img.shields.io/crates/d/rivets)
+[![](https://img.shields.io/badge/License-Rivets_2024-green)](https://github.com/notnotmelon/rivets/blob/master/LICENSE.md)
+
+</div>
+
+Welcome to Rivets, a Factorio mod loader written in Rust! Rivets injects code into the Factorio binary via DLL injection, providing a powerful toolset for modding and enhancing the game.
 
 Mods written in Rivets have access to functionality not possible within the traditional Lua API.
 - Directly modifiy functionality in the compiled Factorio executable.
@@ -27,7 +41,7 @@ This will intercept the `main` function call and execute your custom logic, allo
 ```rust
 #[on_event(defines::events::on_player_died)]
 fn on_player_died(player_index: u32, cause: LuaEntity) {
-    let player: LuaPlayer = game.get_player(player_index);
+    let player: LuaPlayer = game::get_player(player_index);
     player.print("You just lost the game 💀");
 }
 ```
@@ -48,7 +62,7 @@ We are actively seeking contributors to help expand this project, particularly f
 6. **Open a pull request**
 
 We welcome contributions of all kinds, including bug fixes, new features, documentation improvements, and more.
-See our open [ISSUES](https://github.com/notnotmelon/rivets/issues) if you are interested in becoming a contributor.
+See our open [issues](https://github.com/notnotmelon/rivets/issues) if you are interested in becoming a contributor.
 
 ## Credits
 
@@ -60,8 +74,8 @@ A huge thank-you to the following crates, without which this project would not b
 
 ## License
 
-This project is licensed under a custom license. See the [LICENSE](https://github.com/notnotmelon/rivets?tab=License-1-ov-file) file for details.
-Any mods released using Rivets must have freely avalible source code.
+This project is licensed under a custom license. See the [license](https://github.com/notnotmelon/rivets?tab=License-1-ov-file) file for details.
+Any mods released using Rivets must have freely available source code.
 
 ```
 1. Any modifications, adaptations, or derivative works (collectively "Mods")
@@ -72,7 +86,6 @@ Any mods released using Rivets must have freely avalible source code.
 ## Contact
 
 For any questions or support, please open an issue on GitHub or use GitHub discussions.
-We also have a community on [Discord](https://discord.gg/SBHM3h5Utj).
 
 ---
 
