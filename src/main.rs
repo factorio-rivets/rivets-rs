@@ -8,6 +8,8 @@ use windows::Win32::System::Threading::{
     CreateProcessA, ResumeThread, CREATE_SUSPENDED, PROCESS_INFORMATION, STARTUPINFOA,
 };
 
+mod structs;
+
 fn inject_dll(dll_name: &str) -> Result<()> {
     println!("Injecting DLL into Factorio process...");
     let Some(process) = OwnedProcess::find_first_by_name("factorio") else {
