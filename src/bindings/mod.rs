@@ -1,5 +1,5 @@
-use pdb2hpp::write_class;
 use anyhow::Result;
+use pdb2hpp::write_class;
 
 mod pdb2hpp;
 

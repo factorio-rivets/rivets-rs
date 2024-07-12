@@ -1,7 +1,7 @@
+use anyhow::{bail, Result};
 use core::panic;
 use std::collections::BTreeSet;
 use std::fmt;
-use anyhow::{bail, Result};
 
 use pdb::FallibleIterator;
 
@@ -20,7 +20,7 @@ pub fn variable_identifier_suffix(
             suffix
         }
 
-        _ => String::new()
+        _ => String::new(),
     };
 
     Ok(suffix)
@@ -51,7 +51,7 @@ pub fn type_name(
                 pdb::PrimitiveKind::Bool8 => "bool".to_string(),
 
                 pdb::PrimitiveKind::NoType => "void".to_string(),
-                pdb::PrimitiveKind::RChar => "char".to_string(),  // Assuming RChar is regular char
+                pdb::PrimitiveKind::RChar => "char".to_string(), // Assuming RChar is regular char
                 pdb::PrimitiveKind::WChar => "wchar_t".to_string(),
                 pdb::PrimitiveKind::RChar16 => "char16_t".to_string(),
                 pdb::PrimitiveKind::RChar32 => "char32_t".to_string(),
@@ -59,24 +59,24 @@ pub fn type_name(
                 pdb::PrimitiveKind::UShort => "unsigned short".to_string(),
                 pdb::PrimitiveKind::Long => "long".to_string(),
                 pdb::PrimitiveKind::ULong => "unsigned long".to_string(),
-                pdb::PrimitiveKind::Quad => "int64_t".to_string(),  // Quad is typically 64-bit
+                pdb::PrimitiveKind::Quad => "int64_t".to_string(), // Quad is typically 64-bit
                 pdb::PrimitiveKind::UQuad => "uint64_t".to_string(),
-                pdb::PrimitiveKind::Octa => "int128_t".to_string(),  // Assuming Octa is 128-bit
+                pdb::PrimitiveKind::Octa => "int128_t".to_string(), // Assuming Octa is 128-bit
                 pdb::PrimitiveKind::UOcta => "uint128_t".to_string(),
                 pdb::PrimitiveKind::I128 => "int128_t".to_string(),
                 pdb::PrimitiveKind::U128 => "uint128_t".to_string(),
-                pdb::PrimitiveKind::F16 => "__fp16".to_string(),  // Assuming F16 is half-precision floating-point
-                pdb::PrimitiveKind::F32PP => "float _Complex".to_string(),  // Assuming F32PP is complex float
-                pdb::PrimitiveKind::F48 => "float _Complex".to_string(),  // Assuming F48 is complex float (needs confirmation)
+                pdb::PrimitiveKind::F16 => "__fp16".to_string(), // Assuming F16 is half-precision floating-point
+                pdb::PrimitiveKind::F32PP => "float _Complex".to_string(), // Assuming F32PP is complex float
+                pdb::PrimitiveKind::F48 => "float _Complex".to_string(), // Assuming F48 is complex float (needs confirmation)
                 pdb::PrimitiveKind::F80 => "long double".to_string(),
-                pdb::PrimitiveKind::F128 => "__float128".to_string(),  // Quad-precision floating-point
+                pdb::PrimitiveKind::F128 => "__float128".to_string(), // Quad-precision floating-point
                 pdb::PrimitiveKind::Complex32 => "_Complex float".to_string(),
                 pdb::PrimitiveKind::Complex64 => "_Complex double".to_string(),
                 pdb::PrimitiveKind::Complex80 => "_Complex long double".to_string(),
-                pdb::PrimitiveKind::Complex128 => "_Complex __float128".to_string(),  // Assuming complex quad-precision
-                pdb::PrimitiveKind::Bool16 => "_Bool16".to_string(),  // Assuming 16-bit boolean
-                pdb::PrimitiveKind::Bool32 => "_Bool32".to_string(),  // Assuming 32-bit boolean
-                pdb::PrimitiveKind::Bool64 => "_Bool64".to_string(),  // Assuming 64-bit boolean
+                pdb::PrimitiveKind::Complex128 => "_Complex __float128".to_string(), // Assuming complex quad-precision
+                pdb::PrimitiveKind::Bool16 => "_Bool16".to_string(), // Assuming 16-bit boolean
+                pdb::PrimitiveKind::Bool32 => "_Bool32".to_string(), // Assuming 32-bit boolean
+                pdb::PrimitiveKind::Bool64 => "_Bool64".to_string(), // Assuming 64-bit boolean
                 pdb::PrimitiveKind::HRESULT => "HRESULT".to_string(),
                 _ => panic!("Unknown primitive type {:?}", data.kind),
             };
@@ -125,9 +125,7 @@ pub fn type_name(
             }
         }
 
-        pdb::TypeData::Array(data) => {
-            type_name(type_finder, data.element_type, needed_types)?
-        }
+        pdb::TypeData::Array(data) => type_name(type_finder, data.element_type, needed_types)?,
 
         _ => format!("Type{type_index} /* TODO: figure out how to name it */"),
     };
@@ -565,7 +563,7 @@ impl<'p> Data<'p> {
             forward_references: Vec::new(),
             classes: Vec::new(),
             enums: Vec::new(),
-            includes
+            includes,
         }
     }
 

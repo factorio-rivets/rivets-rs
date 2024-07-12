@@ -8,8 +8,8 @@ use windows::Win32::System::Threading::{
     CreateProcessA, ResumeThread, CREATE_SUSPENDED, PROCESS_INFORMATION, STARTUPINFOA,
 };
 
-mod luastate;
 mod bindings;
+mod luastate;
 
 fn inject_dll(dll_name: &str) -> Result<()> {
     println!("Injecting DLL into Factorio process...");
@@ -89,7 +89,7 @@ fn inject() -> Result<()> {
 
 fn main() -> Result<()> {
     let pdb_path = r"C:\Users\zacha\Documents\factorio\bin\x64\factorio.pdb";
-    
+
     if std::env::args().any(|x| x == *"bindings") {
         bindings::generate(pdb_path)?;
     } else {
