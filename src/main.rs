@@ -1,8 +1,11 @@
 use anyhow::{anyhow, bail, Result};
 use dll_syringe::{process::OwnedProcess, Syringe};
+use std::ffi::CString;
 use std::io;
 use std::net::TcpListener;
-use windows::core::{s, PCSTR, PSTR};
+use std::path::Path;
+use traits::{factorio_path, AsPcstr};
+use windows::core::{PCSTR, PSTR};
 use windows::Win32::Foundation::CloseHandle;
 use windows::Win32::System::Threading::{
     CreateProcessA, ResumeThread, CREATE_SUSPENDED, PROCESS_INFORMATION, STARTUPINFOA,
@@ -10,8 +13,9 @@ use windows::Win32::System::Threading::{
 
 mod bindings;
 mod luastate;
+mod traits;
 
-fn inject_dll(dll_name: &str) -> Result<()> {
+fn inject_dll(dll_name: &Path) -> Result<()> {
     println!("Injecting DLL into Factorio process...");
     let Some(process) = OwnedProcess::find_first_by_name("factorio") else {
         bail!("Factorio process not found.");
@@ -54,15 +58,22 @@ fn start_factorio(factorio_path: PCSTR) -> Result<PROCESS_INFORMATION> {
 }
 
 fn inject() -> Result<()> {
-    let dll_path = r"target\debug\examplemod.dll";
+    let dll_path = Path::new("./target/debug/examplemod.dll");
 
     let listener = TcpListener::bind("127.0.0.1:40267");
     let listener = listener.map_err(|e| {
         anyhow!("Failed to copy the Factorio output logs. Is rivets already running?\n{e}")
     })?;
 
-    let factorio_path = s!(r"C:\Users\zacha\Documents\factorio\bin\x64\factorio.exe");
-    let factorio_process_information: PROCESS_INFORMATION = start_factorio(factorio_path)?;
+    let factorio_path = CString::new(
+        factorio_path("factorio.exe")?
+            .as_os_str()
+            .to_string_lossy()
+            .into_owned(),
+    )?;
+    println!("Factorio path: {factorio_path:?}");
+    let factorio_process_information: PROCESS_INFORMATION =
+        start_factorio(factorio_path.as_pcstr())?;
     let process_handle = factorio_process_information.hProcess;
 
     inject_dll(dll_path)?;
@@ -88,10 +99,9 @@ fn inject() -> Result<()> {
 }
 
 fn main() -> Result<()> {
-    let pdb_path = r"C:\Users\zacha\Documents\factorio\bin\x64\factorio.pdb";
-
     if std::env::args().any(|x| x == *"bindings") {
-        bindings::generate(pdb_path)?;
+        let pdb_path = factorio_path("factorio.pdb")?;
+        bindings::generate(&pdb_path)?;
     } else {
         inject()?;
     }

@@ -2,6 +2,7 @@ use anyhow::{bail, Result};
 use core::panic;
 use std::collections::BTreeSet;
 use std::fmt;
+use std::path::Path;
 
 use pdb::FallibleIterator;
 
@@ -628,7 +629,7 @@ impl<'p> Data<'p> {
     }
 }
 
-pub fn write_class(filename: &str, class_name: &str) -> Result<String> {
+pub fn write_class(filename: &Path, class_name: &str) -> Result<String> {
     let file = std::fs::File::open(filename)?;
     let mut pdb = pdb::PDB::open(file)?;
 

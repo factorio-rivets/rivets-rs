@@ -1,9 +1,11 @@
+use std::path::Path;
+
 use anyhow::Result;
 use pdb2hpp::write_class;
 
 mod pdb2hpp;
 
-pub fn generate(pdb_path: &str) -> Result<()> {
+pub fn generate(pdb_path: &Path) -> Result<()> {
     let class_name = "lua_Debug";
 
     let header = write_class(pdb_path, class_name)?;

@@ -1,13 +1,16 @@
 use anyhow::{bail, Result};
 use pdb::{FallibleIterator, PDB};
 use retour::static_detour;
-use std::ffi::c_char;
+use std::ffi::{c_char, CString};
 use std::net::TcpStream;
+use std::path::Path;
 use std::sync::Mutex;
 use std::{collections::HashMap, ffi::c_int, fs::File, mem};
 use tracing::{error, info};
-use windows::core::PCSTR;
+use traits::{factorio_path, AsPcstr};
 use windows::Win32::System::LibraryLoader::GetModuleHandleA;
+
+mod traits;
 
 struct PDBCache {
     pdb: PDB<'static, File>,
@@ -16,7 +19,7 @@ struct PDBCache {
 }
 
 impl PDBCache {
-    fn new(pdb_path: &str, module_name: &str) -> Result<Self> {
+    fn new(pdb_path: &Path, module_name: &str) -> Result<Self> {
         let file = File::open(pdb_path)?;
         let pdb = PDB::open(file)?;
         let base_address = unsafe { get_dll_base_address(module_name)? };
@@ -61,7 +64,7 @@ impl PDBCache {
 }
 
 unsafe fn get_dll_base_address(module_name: &str) -> Result<u64> {
-    let result = GetModuleHandleA(module_name.as_pcstr());
+    let result = GetModuleHandleA(CString::new(module_name)?.as_pcstr());
     match result {
         Ok(handle) => Ok(handle.0 as u64),
         Err(err) => bail!(err),
@@ -80,21 +83,7 @@ fn main_detour(_argc: c_int, _argv: *const c_char, _envp: *const c_char) -> bool
     false
 }
 
-trait AsPcstr {
-    unsafe fn as_pcstr(&self) -> PCSTR;
-}
-
-impl AsPcstr for str {
-    /// This is unsafe because `PCSTR` does not implement the `Sized` trait and thus its bytes may be overwritten.
-    /// Use the `s!` macro to create a safe `PCSTR` at compile-time.
-    unsafe fn as_pcstr(&self) -> PCSTR {
-        PCSTR(format!("{self}\0").as_ptr().cast())
-    }
-}
-
-unsafe fn hook(pdb_cache: &PDBCache) -> Result<()> {
-    let function_name = "?valid@LuaSurface@@UEBA_NXZ";
-
+unsafe fn hook(pdb_cache: &PDBCache, function_name: &str) -> Result<()> {
     let Some(address) = pdb_cache.get_function_address(function_name) else {
         bail!("Failed to find main address");
     };
@@ -105,8 +94,15 @@ unsafe fn hook(pdb_cache: &PDBCache) -> Result<()> {
     Ok(())
 }
 
-#[ctor::ctor]
-fn ctor() {
+fn inject() -> Result<()> {
+    let pdb_path = factorio_path("factorio.pdb")?;
+    let cache = PDBCache::new(&pdb_path, "factorio.exe")?;
+
+    let function_name = "?valid@LuaSurface@@UEBA_NXZ";
+    unsafe { hook(&cache, function_name) }
+}
+
+fn start_steam() {
     let ip = "127.0.0.1:40267";
     let stream = TcpStream::connect(ip).unwrap_or_else(|_| {
         panic!("Could not establish stdout connection to rivets. Port {ip} is busy.")
@@ -114,20 +110,13 @@ fn ctor() {
     tracing_subscriber::fmt::fmt()
         .with_writer(Mutex::new(stream))
         .init();
+}
 
-    let cache = match PDBCache::new(
-        r"%userprofile%\Documents\factorio\bin\x64\factorio.pdb",
-        "factorio.exe",
-    ) {
-        Ok(cache) => cache,
-        Err(e) => {
-            error!("Failed to parse Factorio PDB file. {e:?}");
-            return;
-        }
-    };
+#[ctor::ctor]
+fn ctor() {
+    start_steam();
 
-    let result = unsafe { hook(&cache) };
-    if let Err(e) = result {
-        error!("{e:?}");
+    if let Err(e) = inject() {
+        error!("{e}");
     }
 }
