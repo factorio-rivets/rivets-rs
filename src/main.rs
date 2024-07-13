@@ -11,7 +11,7 @@ use windows::Win32::System::Threading::{
     CreateProcessA, ResumeThread, CREATE_SUSPENDED, PROCESS_INFORMATION, STARTUPINFOA,
 };
 
-mod bindings;
+mod pdb2hpp;
 mod luastate;
 mod traits;
 
@@ -101,7 +101,7 @@ fn inject() -> Result<()> {
 fn main() -> Result<()> {
     if std::env::args().any(|x| x == *"bindings") {
         let pdb_path = factorio_path("factorio.pdb")?;
-        bindings::generate(&pdb_path)?;
+        pdb2hpp::generate(&pdb_path)?;
     } else {
         inject()?;
     }
