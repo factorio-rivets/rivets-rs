@@ -11,8 +11,8 @@ use windows::Win32::System::Threading::{
     CreateProcessA, ResumeThread, CREATE_SUSPENDED, PROCESS_INFORMATION, STARTUPINFOA,
 };
 
-mod pdb2hpp;
 mod luastate;
+mod pdb2hpp;
 mod traits;
 
 fn inject_dll(dll_name: &Path) -> Result<()> {
