@@ -122,7 +122,7 @@ fn convert_pdb_data_to_cpp_code(
             base_classes.push(format!("{attributes}{type_name}"));
 
             format!(
-                "/* offset {:3} */ /* fields for {} */\n",
+                "/* offset {:3} */ /* fields for {} */",
                 data.offset, type_name
             )
         }
@@ -138,9 +138,15 @@ fn convert_pdb_data_to_cpp_code(
             let mut fields: Vec<String> = Vec::new();
             for field in data.fields {
                 let err = format!("/* field type not found: {field:?} */");
-                fields.push(
-                    convert_pdb_data_to_cpp_code(type_finder, field, base_classes).unwrap_or(err),
-                );
+                let is_enumerate = matches!(field, pdb::TypeData::Enumerate(_));
+                let mut s = convert_pdb_data_to_cpp_code(type_finder, field.clone(), base_classes)
+                    .unwrap_or(err);
+
+                if !is_enumerate {
+                    // if we dont have an enum, we need to add a semicolon
+                    s.push(';');
+                }
+                fields.push(s);
             }
             if let Some(continuation) = data.continuation {
                 // recurse
@@ -161,7 +167,7 @@ fn convert_pdb_data_to_cpp_code(
                 convert_pdb_data_to_cpp_code_from_index(type_finder, data.fields, base_classes)?;
             let fields = do_indent(&fields);
 
-            format!("union {type_name} {{\n{fields}\n}};")
+            format!("union {type_name} {{\n{fields}\n}}")
         }
         pdb::TypeData::Enumerate(data) => {
             // One of the values inside an enum
@@ -177,7 +183,7 @@ fn convert_pdb_data_to_cpp_code(
             let fields = do_indent(&fields);
 
             format!(
-                "enum {type_name} /* stored as {} */ {{\n{fields}\n}};",
+                "enum {type_name} /* stored as {} */ {{\n{fields}\n}}",
                 data.underlying_type,
             )
         }
@@ -188,13 +194,7 @@ fn convert_pdb_data_to_cpp_code(
                 data.underlying_type,
                 base_classes,
             )?;
-            if s.ends_with(';') {
-                s.pop();
-                s.push('*');
-                s.push(';');
-            } else {
-                s.push('*');
-            }
+            s.push('*');
             s
         }
         pdb::TypeData::Modifier(data) => {
@@ -250,7 +250,7 @@ fn convert_pdb_data_to_cpp_code(
             format!("{}{s}", FieldAttributes(data.attributes, false).as_string())
         }
         pdb::TypeData::Method(data) => {
-            Method::find(type_finder, data.name, data.attributes, data.method_type)?.as_string()
+            Method::new(type_finder, data.name, data.attributes, data.method_type)?.as_string()
         }
 
         pdb::TypeData::OverloadedMethod(data) => {
@@ -266,7 +266,7 @@ fn convert_pdb_data_to_cpp_code(
                     } in method_list.methods
                     {
                         // hooray
-                        let method = Method::find(type_finder, data.name, attributes, method_type)?;
+                        let method = Method::new(type_finder, data.name, attributes, method_type)?;
 
                         s.push(method.as_string());
                     }
@@ -323,7 +323,7 @@ impl<'p> Class<'p> {
         );
 
         if self.data.properties.forward_reference() {
-            return format!("{name};");
+            return name.to_string();
         }
 
         let mut fields: Vec<String> = Vec::new();
@@ -355,7 +355,7 @@ impl<'p> Class<'p> {
         }
 
         let fields = do_indent(&fields.join("\n"));
-        format!("{name} {{\n{fields}\n}};")
+        format!("{name} {{\n{fields}\n}}")
     }
 
     #[allow(clippy::unnecessary_wraps)]
@@ -378,8 +378,8 @@ struct Field {
 impl Field {
     fn as_string(&self) -> String {
         self.offset.map_or_else(
-            || format!("{} {};", self.type_name, self.name),
-            |offset| format!("/* offset {offset:3} */ {} {};", self.type_name, self.name),
+            || format!("{} {}", self.type_name, self.name),
+            |offset| format!("/* offset {offset:3} */ {} {}", self.type_name, self.name),
         )
     }
 }
@@ -394,7 +394,7 @@ struct Method<'p> {
 }
 
 impl<'p> Method<'p> {
-    fn find(
+    fn new(
         type_finder: &pdb::TypeFinder<'p>,
         name: pdb::RawString<'p>,
         attributes: pdb::FieldAttributes,
@@ -424,7 +424,7 @@ impl<'p> Method<'p> {
 
     fn as_string(&self) -> String {
         format!(
-            "{}{}{} {}({});",
+            "{}{}{} {}({})",
             if self.is_static { "static " } else { "" },
             if self.is_virtual { "virtual " } else { "" },
             self.return_type_name,
@@ -529,10 +529,10 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
             &convert_pdb_data_to_cpp_code(&type_finder, data, &mut Vec::new())
                 .unwrap_or_else(|e| format!("/* error processing type index {type_index} {e}*/")),
         );
+        header.push(';');
         header.push('\n');
         Ok(())
     });
-
 
     let mut typedefs_str = String::new();
     for (from, to) in typedefs() {
