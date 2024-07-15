@@ -180,7 +180,8 @@ fn convert_pdb_data_to_cpp_code(
                 data.underlying_type,
             )
         }
-        pdb::TypeData::Pointer(data) => { // Pointer to a diffrent datatype
+        pdb::TypeData::Pointer(data) => {
+            // Pointer to a diffrent datatype
             let mut s = convert_pdb_data_to_cpp_code_from_index(
                 type_finder,
                 data.underlying_type,
@@ -473,25 +474,30 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
     header.push('\n');
     header.push('\n');
 
+    let progressbar = indicatif::ProgressBar::new(type_information.len() as u64);
     let mut i = 0;
+    let delta = 47;
+
     let _ = type_information.iter().for_each(|symbol| {
+        if i % delta == 0 { progressbar.inc(delta); }
+        i += 1;
+
         let type_index = symbol.index();
         let data = match type_finder.find(type_index)?.parse() {
             Ok(data) => data,
             Err(e) => {
-                println!("Error parsing type index {symbol:?} {e}");
+                header.push_str(&format!("/* error processing type index {symbol:?} {e}*/"));
                 return Ok(());
             }
         };
 
-        i += 1;
-        if i % 1000 == 0 {
-            println!("Processing type index {i}");
-        }
-
-        if let pdb::TypeData::FieldList(_) = data {
-            // I'm not sure why field lists show up in the top level PDB. Skip them.
-            return Ok(());
+        match &data {
+            // The type_information list contains all types, not just top-level types. We need to filter for only classes, unions, enums, and procedures.
+            pdb::TypeData::Class(data) if !data.properties.forward_reference() => {}
+            pdb::TypeData::Union(data) if !data.properties.forward_reference() => {}
+            pdb::TypeData::Enumeration(data) if !data.properties.forward_reference() => {}
+            pdb::TypeData::Procedure(_) => {}
+            _ => return Ok(()),
         }
 
         header.push_str(
