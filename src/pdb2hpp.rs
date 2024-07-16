@@ -122,6 +122,71 @@ fn stringify_properties(properties: pdb::TypeProperties) -> String {
     }
 }
 
+fn split_cpp_class_name(class_name: &str) -> Vec<String> {
+    let mut result = Vec::new();
+    let mut current = String::new();
+    let mut template_depth = 0;
+
+    let chars: Vec<char> = class_name.chars().collect();
+    let mut i = 0;
+
+    while i < chars.len() {
+        match chars[i] {
+            '<' => {
+                template_depth += 1;
+                current.push('<');
+            }
+            '>' => {
+                template_depth -= 1;
+                current.push('>');
+            }
+            ':' if i + 1 < chars.len() && chars[i + 1] == ':' => {
+                if template_depth == 0 {
+                    result.push(current.trim().to_string());
+                    current.clear();
+                    i += 1; // skip the next ':'
+                } else {
+                    current.push(':');
+                }
+            }
+            _ => {
+                current.push(chars[i]);
+            }
+        }
+        i += 1;
+    }
+
+    if !current.is_empty() {
+        result.push(current.trim().to_string());
+    }
+
+    result
+}
+
+fn parse_namespaces(data_structure: &str, name: &str) -> String {
+    let mut namespaces = split_cpp_class_name(name);
+    let short_name = namespaces.pop().unwrap_or_default();
+    if namespaces.is_empty() {
+        return format!("{data_structure};");
+    }
+
+    let data_structure = data_structure.replacen(name, &short_name, 1);
+
+    let mut namespaced_string = String::new();
+    for namespace in &namespaces {
+        namespaced_string.push_str("namespace ");
+        namespaced_string.push_str(namespace);
+        namespaced_string.push_str(" { ");
+    }
+    namespaced_string.push_str(&data_structure);
+    namespaced_string.push(';');
+    for _ in &namespaces {
+        namespaced_string.push_str(" }");
+    }
+    namespaced_string.push(';');
+    namespaced_string
+}
+
 #[allow(clippy::too_many_lines)]
 fn convert_pdb_data_to_cpp_code(
     type_finder: &pdb::TypeFinder<'_>,
@@ -377,7 +442,10 @@ impl<'p> Class<'p> {
         }
 
         let fields = do_indent(&fields.join("\n"));
-        format!("{}{name} {{\n{fields}\n}}", stringify_properties(self.data.properties))
+        format!(
+            "{}{name} {{\n{fields}\n}}",
+            stringify_properties(self.data.properties)
+        )
     }
 
     #[allow(clippy::unnecessary_wraps)]
@@ -535,6 +603,52 @@ fn typedefs() -> HashMap<&'static str, &'static str> {
     typedefs
 }
 
+/// Get all possible forward refrences at the top of the header.hpp so bindgen/clang doesn't compain.
+pub fn decompile_forward_refrences(
+    type_finder: &pdb::TypeFinder<'_>,
+    type_information: &pdb::TypeInformation,
+) -> String {
+    let mut forward_refrences = Vec::new();
+
+    let _ = type_information.iter().for_each(|symbol| {
+        let type_index = symbol.index();
+        let Ok(data) = type_finder.find(type_index)?.parse() else {
+            return Ok(());
+        };
+
+        match &data {
+            pdb::TypeData::Class(data)
+                if data.properties.forward_reference()
+                    && !data.properties.is_nested_type()
+                    && !data.properties.scoped_definition() => {}
+            pdb::TypeData::Union(data)
+                if data.properties.forward_reference()
+                    && !data.properties.is_nested_type()
+                    && !data.properties.scoped_definition() => {}
+            pdb::TypeData::Enumeration(data)
+                if data.properties.forward_reference()
+                    && !data.properties.is_nested_type()
+                    && !data.properties.scoped_definition() => {}
+            _ => return Ok(()),
+        }
+
+        let name = data.name().unwrap().to_string();
+        let forward_refrence = convert_pdb_data_to_cpp_code(type_finder, data, &mut Vec::new());
+        let forward_refrence = forward_refrence
+            .unwrap_or_else(|e| format!("/* error processing type index {type_index} {e}*/"));
+        let forward_refrence = parse_namespaces(&forward_refrence, &name);
+
+        forward_refrences.push(forward_refrence);
+
+        Ok(())
+    });
+
+    forward_refrences.sort();
+    let mut forward_refrences = forward_refrences.join("\n");
+    forward_refrences.push('\n');
+    forward_refrences
+}
+
 pub fn generate(pdb_path: &Path) -> Result<()> {
     let pdb = File::open(pdb_path)?;
     let mut pdb = pdb::PDB::open(pdb)?;
@@ -554,32 +668,7 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
 
     let progressbar = indicatif::ProgressBar::new(type_information.len() as u64);
     let mut i = 0;
-    let delta = 47;
-
-    let mut forward_refrences = String::new();
-    let _ = type_information.iter().for_each(|symbol| {
-        let type_index = symbol.index();
-        let Ok(data) = type_finder.find(type_index)?.parse() else {
-            return Ok(());
-        };
-
-        match &data {
-            // Get all the forward refrences at the top so bindgen doesn't compain.
-            pdb::TypeData::Class(data) if data.properties.forward_reference() => {}
-            pdb::TypeData::Union(data) if data.properties.forward_reference() => {}
-            pdb::TypeData::Enumeration(data) if data.properties.forward_reference() => {}
-            _ => return Ok(()),
-        }
-
-        forward_refrences.push_str(
-            &convert_pdb_data_to_cpp_code(&type_finder, data, &mut Vec::new())
-                .unwrap_or_else(|e| format!("/* error processing type index {type_index} {e}*/")),
-        );
-        forward_refrences.push(';');
-        forward_refrences.push('\n');
-
-        Ok(())
-    });
+    let delta = 87;
 
     let mut header = String::new();
     let _ = type_information.iter().for_each(|symbol| {
@@ -601,20 +690,32 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
 
         match &data {
             // The type_information list contains all types, not just top-level types. We need to filter for only classes, unions, enums.
-            pdb::TypeData::Class(data) if !data.properties.forward_reference() => {}
-            pdb::TypeData::Union(data) if !data.properties.forward_reference() => {}
-            pdb::TypeData::Enumeration(data) if !data.properties.forward_reference() => {}
+            pdb::TypeData::Class(data)
+                if !data.properties.forward_reference()
+                    && !data.properties.is_nested_type()
+                    && !data.properties.scoped_definition() => {}
+            pdb::TypeData::Union(data)
+                if !data.properties.forward_reference()
+                    && !data.properties.is_nested_type()
+                    && !data.properties.scoped_definition() => {}
+            pdb::TypeData::Enumeration(data)
+                if !data.properties.forward_reference()
+                    && !data.properties.is_nested_type()
+                    && !data.properties.scoped_definition() => {}
             _ => return Ok(()),
         }
 
-        header.push_str(
-            &convert_pdb_data_to_cpp_code(&type_finder, data, &mut Vec::new())
-                .unwrap_or_else(|e| format!("/* error processing type index {type_index} {e}*/")),
-        );
-        header.push(';');
+        let name = data.name().unwrap().to_string();
+        let s = convert_pdb_data_to_cpp_code(&type_finder, data, &mut Vec::new());
+        let s = s.unwrap_or_else(|e| format!("/* error processing type index {type_index} {e}*/"));
+        let s = parse_namespaces(&s, &name);
+
+        header.push_str(&s);
         header.push('\n');
         Ok(())
     });
+
+    let forward_refrences = decompile_forward_refrences(&type_finder, &type_information);
 
     let mut typedefs_str = String::new();
     for (from, to) in typedefs() {
