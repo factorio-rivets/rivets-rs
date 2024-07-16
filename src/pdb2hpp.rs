@@ -57,7 +57,7 @@ fn primitive_name(data: pdb::PrimitiveType) -> String {
     };
 
     if data.indirection.is_some() {
-        name.push_str(" *");
+        name.push('*');
     }
 
     name
@@ -78,6 +78,50 @@ impl FieldAttributes {
     }
 }
 
+fn stringify_properties(properties: pdb::TypeProperties) -> String {
+    let mut s = String::new();
+
+    if properties.packed() {
+        s.push_str("packed ");
+    }
+    if properties.constructors() {
+        s.push_str("constructors ");
+    }
+    if properties.overloaded_operators() {
+        s.push_str("overloaded_operators ");
+    }
+    if properties.is_nested_type() {
+        s.push_str("is_nested_type ");
+    }
+    if properties.contains_nested_types() {
+        s.push_str("contains_nested_types ");
+    }
+    if properties.overloaded_assignment() {
+        s.push_str("overloaded_assignment ");
+    }
+    if properties.overloaded_casting() {
+        s.push_str("overloaded_casting ");
+    }
+    if properties.scoped_definition() {
+        s.push_str("scoped_definition ");
+    }
+    if properties.sealed() {
+        s.push_str("sealed ");
+    }
+    if properties.intrinsic_type() {
+        s.push_str("intrinsic_type ");
+    }
+    if properties.hfa() != 0 {
+        s.push_str(&format!("hfa={} ", properties.hfa()));
+    }
+
+    if s.is_empty() {
+        s
+    } else {
+        format!("/* {s}*/ ")
+    }
+}
+
 #[allow(clippy::too_many_lines)]
 fn convert_pdb_data_to_cpp_code(
     type_finder: &pdb::TypeFinder<'_>,
@@ -85,39 +129,24 @@ fn convert_pdb_data_to_cpp_code(
     base_classes: &mut Vec<String>,
 ) -> Result<String, pdb::Error> {
     Ok(match type_data {
-        pdb::TypeData::Member(data) => Field {
+        pdb::TypeData::Member(data) => {
             // A field inside a class
-            type_name: convert_pdb_data_to_cpp_code_from_index(
-                type_finder,
-                data.field_type,
-                base_classes,
-            )?,
-            name: data.name.to_string().into(),
-            offset: Some(data.offset),
+            Field {
+                type_name: type_index_to_string(type_finder, data.field_type),
+                name: data.name.to_string().into(),
+                offset: Some(data.offset),
+            }
+            .as_string()
         }
-        .as_string(),
-
-        pdb::TypeData::StaticMember(data) => Field {
-            // A static field inside a class
-            type_name: format!(
-                "static {}",
-                convert_pdb_data_to_cpp_code_from_index(
-                    type_finder,
-                    data.field_type,
-                    base_classes
-                )?
-            ),
-            name: data.name.to_string().into(),
-            offset: None,
+        pdb::TypeData::StaticMember(data) => {
+            let type_data = type_finder.find(data.field_type)?.parse()?;
+            let s = convert_pdb_data_to_cpp_code(type_finder, type_data, base_classes)?;
+            format!("static {s}")
         }
-        .as_string(),
 
         pdb::TypeData::BaseClass(data) => {
             let attributes = FieldAttributes(data.attributes, false).as_string();
-            let type_name = type_data.name().map_or_else(
-                || "<unknown parent class>".to_string(),
-                |type_name| type_name.to_string().into_owned(),
-            );
+            let type_name = type_index_to_string(type_finder, data.base_class);
 
             base_classes.push(format!("{attributes}{type_name}"));
 
@@ -163,11 +192,18 @@ fn convert_pdb_data_to_cpp_code(
             // TODO handle data.properties
             let type_name = data.name.to_string().into_owned();
 
+            if data.properties.forward_reference() {
+                return Ok(format!("union {type_name}"));
+            }
+
             let fields =
                 convert_pdb_data_to_cpp_code_from_index(type_finder, data.fields, base_classes)?;
             let fields = do_indent(&fields);
 
-            format!("union {type_name} {{\n{fields}\n}}")
+            format!(
+                "{}union {type_name} {{\n{fields}\n}}",
+                stringify_properties(data.properties),
+            )
         }
         pdb::TypeData::Enumerate(data) => {
             // One of the values inside an enum
@@ -183,7 +219,8 @@ fn convert_pdb_data_to_cpp_code(
             let fields = do_indent(&fields);
 
             format!(
-                "enum {type_name} /* stored as {} */ {{\n{fields}\n}}",
+                "{}enum {type_name} /* stored as {} */ {{\n{fields}\n}}",
+                stringify_properties(data.properties),
                 data.underlying_type,
             )
         }
@@ -199,21 +236,12 @@ fn convert_pdb_data_to_cpp_code(
         }
         pdb::TypeData::Modifier(data) => {
             // Wrapper around another type that describes a modifier. Can be const, volatile, or unaligned.
-            let mut s = convert_pdb_data_to_cpp_code_from_index(
+            let s = convert_pdb_data_to_cpp_code_from_index(
                 type_finder,
                 data.underlying_type,
                 base_classes,
             )?;
-            if data.constant {
-                s = format!("const {s}");
-            }
-            if data.volatile {
-                s = format!("volatile {s}");
-            }
-            if data.unaligned {
-                s = format!("__unaligned {s}");
-            }
-            s
+            format!("{}{s}", modifier_string(data))
         }
         pdb::TypeData::Array(data) => {
             let mut suffix: String = String::new();
@@ -228,18 +256,12 @@ fn convert_pdb_data_to_cpp_code(
             format!("{name}{suffix}")
         }
         pdb::TypeData::Procedure(data) => {
-            if let Some(return_type) = data.return_type {
-                let return_type = convert_pdb_data_to_cpp_code_from_index(
-                    type_finder,
-                    return_type,
-                    base_classes,
-                )?;
-                let args = argument_list(type_finder, data.argument_list)?;
-                format!("{return_type}({})", args.join(", "))
-            } else {
-                let args = argument_list(type_finder, data.argument_list)?;
-                format!("void({})", args.join(", "))
-            }
+            let args = argument_list(type_finder, data.argument_list)?.join(", ");
+            let return_type = data.return_type.map_or_else(
+                || "void".to_string(),
+                |return_type| type_index_to_string(type_finder, return_type),
+            );
+            format!("{return_type}({args})")
         }
         pdb::TypeData::Nested(data) => {
             let s = convert_pdb_data_to_cpp_code_from_index(
@@ -355,7 +377,7 @@ impl<'p> Class<'p> {
         }
 
         let fields = do_indent(&fields.join("\n"));
-        format!("{name} {{\n{fields}\n}}")
+        format!("{}{name} {{\n{fields}\n}}", stringify_properties(self.data.properties))
     }
 
     #[allow(clippy::unnecessary_wraps)]
@@ -393,6 +415,45 @@ struct Method<'p> {
     is_static: bool,
 }
 
+fn type_index_to_string(type_finder: &pdb::TypeFinder<'_>, type_index: pdb::TypeIndex) -> String {
+    match type_finder.find(type_index) {
+        Ok(t) => match t.parse() {
+            Ok(pdb::TypeData::Pointer(data)) => format!(
+                "{}*",
+                type_index_to_string(type_finder, data.underlying_type)
+            ),
+
+            Ok(pdb::TypeData::Primitive(data)) => primitive_name(data),
+
+            Ok(data) if matches!(data, pdb::TypeData::Procedure(_)) => {
+                convert_pdb_data_to_cpp_code(type_finder, data, &mut Vec::new()).unwrap_or_else(
+                    |e| format!("/* error processing type index {type_index} {e}*/"),
+                )
+            }
+
+            Ok(pdb::TypeData::Modifier(data)) => {
+                format!(
+                    "{}{}",
+                    modifier_string(data),
+                    type_index_to_string(type_finder, data.underlying_type)
+                )
+            }
+
+            Ok(data) => data.name().map_or_else(
+                || {
+                    convert_pdb_data_to_cpp_code(type_finder, data, &mut Vec::new()).unwrap_or_else(
+                        |e| format!("/* error processing type index {type_index} {e}*/"),
+                    )
+                },
+                |type_name| type_name.to_string().into_owned(),
+            ),
+
+            Err(e) => format!("/* error parsing type index {type_index} {e}*/"),
+        },
+        Err(e) => format!("/* error finding type index {type_index} {e}*/"),
+    }
+}
+
 impl<'p> Method<'p> {
     fn new(
         type_finder: &pdb::TypeFinder<'p>,
@@ -401,17 +462,16 @@ impl<'p> Method<'p> {
         type_index: pdb::TypeIndex,
     ) -> Result<Self, pdb::Error> {
         match type_finder.find(type_index)?.parse()? {
-            pdb::TypeData::MemberFunction(data) => Ok(Method {
-                name,
-                return_type_name: convert_pdb_data_to_cpp_code_from_index(
-                    type_finder,
-                    data.return_type,
-                    &mut Vec::new(),
-                )?,
-                arguments: argument_list(type_finder, data.argument_list)?,
-                is_virtual: attributes.is_virtual(),
-                is_static: attributes.is_static(),
-            }),
+            pdb::TypeData::MemberFunction(data) => {
+                let method = Method {
+                    name,
+                    return_type_name: type_index_to_string(type_finder, data.return_type),
+                    arguments: argument_list(type_finder, data.argument_list)?,
+                    is_virtual: attributes.is_virtual(),
+                    is_static: attributes.is_static(),
+                };
+                Ok(method)
+            }
 
             other => {
                 panic!(
@@ -442,11 +502,7 @@ fn argument_list(
         pdb::TypeData::ArgumentList(data) => {
             let mut args: Vec<String> = Vec::new();
             for arg_type in data.arguments {
-                args.push(convert_pdb_data_to_cpp_code_from_index(
-                    type_finder,
-                    arg_type,
-                    &mut Vec::new(),
-                )?);
+                args.push(type_index_to_string(type_finder, arg_type));
             }
             Ok(args)
         }
@@ -500,6 +556,31 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
     let mut i = 0;
     let delta = 47;
 
+    let mut forward_refrences = String::new();
+    let _ = type_information.iter().for_each(|symbol| {
+        let type_index = symbol.index();
+        let Ok(data) = type_finder.find(type_index)?.parse() else {
+            return Ok(());
+        };
+
+        match &data {
+            // Get all the forward refrences at the top so bindgen doesn't compain.
+            pdb::TypeData::Class(data) if data.properties.forward_reference() => {}
+            pdb::TypeData::Union(data) if data.properties.forward_reference() => {}
+            pdb::TypeData::Enumeration(data) if data.properties.forward_reference() => {}
+            _ => return Ok(()),
+        }
+
+        forward_refrences.push_str(
+            &convert_pdb_data_to_cpp_code(&type_finder, data, &mut Vec::new())
+                .unwrap_or_else(|e| format!("/* error processing type index {type_index} {e}*/")),
+        );
+        forward_refrences.push(';');
+        forward_refrences.push('\n');
+
+        Ok(())
+    });
+
     let mut header = String::new();
     let _ = type_information.iter().for_each(|symbol| {
         if i % delta == 0 {
@@ -511,17 +592,18 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
         let data = match type_finder.find(type_index)?.parse() {
             Ok(data) => data,
             Err(e) => {
-                header.push_str(&format!("/* error processing type index {symbol:?} {e}*/"));
+                header.push_str(&format!(
+                    "/* error processing type index {symbol:?} {e}*/\n"
+                ));
                 return Ok(());
             }
         };
 
         match &data {
-            // The type_information list contains all types, not just top-level types. We need to filter for only classes, unions, enums, and procedures.
+            // The type_information list contains all types, not just top-level types. We need to filter for only classes, unions, enums.
             pdb::TypeData::Class(data) if !data.properties.forward_reference() => {}
             pdb::TypeData::Union(data) if !data.properties.forward_reference() => {}
             pdb::TypeData::Enumeration(data) if !data.properties.forward_reference() => {}
-            pdb::TypeData::Procedure(_) => {}
             _ => return Ok(()),
         }
 
@@ -541,9 +623,9 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
         let new_length = header.len();
         let savings = old_length - new_length;
         println!("{to} typedef saved {savings} bytes");
-        typedefs_str.push_str(&format!("typedef {from} {to};\n"));
+        typedefs_str.push_str(&format!("// typedef {from} {to};\n"));
     }
-    header = format!("// automatically generated by pdb2hpp\n// do not edit\n\n{includes}\n\n{typedefs_str}\n{header}");
+    header = format!("// automatically generated by pdb2hpp\n// do not edit\n\n{includes}\n\n{forward_refrences}\n\n{typedefs_str}\n{header}");
 
     println!("Writing to structs.hpp. File size: {} bytes.", header.len());
     let mut hpp = File::create("./src/structs.hpp")?;
@@ -564,4 +646,18 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
 
 fn do_indent(s: &str) -> String {
     format!("\t{}", s.replace('\n', "\n\t"))
+}
+
+fn modifier_string(modifiers: pdb::ModifierType) -> String {
+    let mut s = String::new();
+    if modifiers.constant {
+        s.push_str("const ");
+    }
+    if modifiers.volatile {
+        s.push_str("volatile ");
+    }
+    if modifiers.unaligned {
+        s.push_str("__unaligned ");
+    }
+    s
 }
