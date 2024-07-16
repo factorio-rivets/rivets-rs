@@ -24,6 +24,8 @@ getopts = "0.2.21"
 bindgen = "0.69.4"
 dirs = "5.0.1"
 indicatif = "0.17.8"
+regex = "1.10.5"
+lazy-regex = "3.1.0"
 
 [lints.clippy]
 nursery = { level = "warn", priority = -1 }

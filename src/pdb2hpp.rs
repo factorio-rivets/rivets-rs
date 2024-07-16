@@ -1,6 +1,7 @@
 use anyhow::Result;
 use core::panic;
-use std::collections::HashMap;
+use lazy_regex::regex;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
@@ -128,10 +129,14 @@ fn split_cpp_class_name(class_name: &str) -> Vec<String> {
     let mut template_depth = 0;
 
     let chars: Vec<char> = class_name.chars().collect();
-    let mut i = 0;
+    let mut skip = false;
 
-    while i < chars.len() {
-        match chars[i] {
+    for (i, char) in chars.iter().enumerate() {
+        if skip {
+            skip = false;
+            continue;
+        }
+        match char {
             '<' => {
                 template_depth += 1;
                 current.push('<');
@@ -144,7 +149,7 @@ fn split_cpp_class_name(class_name: &str) -> Vec<String> {
                 if template_depth == 0 {
                     result.push(current.trim().to_string());
                     current.clear();
-                    i += 1; // skip the next ':'
+                    skip = true; // skip the next ':'
                 } else {
                     current.push(':');
                 }
@@ -153,7 +158,6 @@ fn split_cpp_class_name(class_name: &str) -> Vec<String> {
                 current.push(chars[i]);
             }
         }
-        i += 1;
     }
 
     if !current.is_empty() {
@@ -164,6 +168,9 @@ fn split_cpp_class_name(class_name: &str) -> Vec<String> {
 }
 
 fn parse_namespaces(data_structure: &str, name: &str) -> String {
+    // remove everything after "<"
+    let name = name.split('<').next().unwrap_or_default();
+
     let mut namespaces = split_cpp_class_name(name);
     let short_name = namespaces.pop().unwrap_or_default();
     if namespaces.is_empty() {
@@ -256,6 +263,7 @@ fn convert_pdb_data_to_cpp_code(
             // A union type in c++
             // TODO handle data.properties
             let type_name = data.name.to_string().into_owned();
+            let (templates, type_name, templates_map) = parse_template_types(&type_name);
 
             if data.properties.forward_reference() {
                 return Ok(format!("union {type_name}"));
@@ -263,10 +271,14 @@ fn convert_pdb_data_to_cpp_code(
 
             let fields =
                 convert_pdb_data_to_cpp_code_from_index(type_finder, data.fields, base_classes)?;
-            let fields = do_indent(&fields);
+            let mut fields = do_indent(&fields);
+
+            for (identifier, template) in templates_map {
+                fields = fields.replace(&template, &identifier);
+            }
 
             format!(
-                "{}union {type_name} {{\n{fields}\n}}",
+                "{}{templates}union {type_name} {{\n{fields}\n}}",
                 stringify_properties(data.properties),
             )
         }
@@ -278,6 +290,10 @@ fn convert_pdb_data_to_cpp_code(
             // An enum type in c++
             // TODO handle data.properties
             let type_name = data.name.to_string().into_owned();
+
+            if data.properties.forward_reference() {
+                return Ok(format!("enum {type_name}"));
+            }
 
             let fields =
                 convert_pdb_data_to_cpp_code_from_index(type_finder, data.fields, base_classes)?;
@@ -385,6 +401,110 @@ fn convert_pdb_data_to_cpp_code_from_index(
     convert_pdb_data_to_cpp_code(type_finder, data, base_classes)
 }
 
+/// We need to split template types by commas, however sometimes nested templates contain commas inside <>.
+/// This is a special implementation of the `split()` function to handle the above case.
+fn split_templates(templates: &str) -> Vec<String> {
+    let mut result = Vec::new();
+    let mut current = String::new();
+    let mut template_depth = 0;
+
+    let chars: Vec<char> = templates.chars().collect();
+
+    for char in chars {
+        match char {
+            '<' => {
+                template_depth += 1;
+                current.push('<');
+            }
+            '>' => {
+                template_depth -= 1;
+                current.push('>');
+            }
+            ',' if template_depth == 0 => {
+                result.push(current.clone());
+                current.clear();
+            }
+            _ => {
+                current.push(char);
+            }
+        }
+    }
+
+    if !current.is_empty() {
+        result.push(current);
+    }
+
+    result
+}
+
+fn parse_template_types(class_name: &str) -> (String, String, HashMap<String, String>) {
+    /// Converts a number into base 7 where each digit is a letter from T, U, V, W, X, Y, Z.
+    fn number_to_template_type_name(i: usize) -> String {
+        match i {
+            0 => "T".to_string(),
+            1 => "U".to_string(),
+            2 => "V".to_string(),
+            3 => "W".to_string(),
+            4 => "X".to_string(),
+            5 => "Y".to_string(),
+            6 => "Z".to_string(),
+            _ => {
+                let remainder = i % 7;
+                let i = i / 7;
+                let mut s = number_to_template_type_name(i);
+                s.push_str(&number_to_template_type_name(remainder));
+                s
+            }
+        }
+    }
+
+    let re = regex!(r"(.+?)<(.*)>");
+    let Some(captures) = re.captures(class_name) else {
+        return (String::new(), class_name.to_string(), HashMap::new());
+    };
+
+    #[allow(clippy::expect_used)]
+    let class_name_without_templates = captures
+        .get(1)
+        .expect("Static regex always has one group")
+        .as_str();
+
+    #[allow(clippy::expect_used)]
+    let templates = captures
+        .get(2)
+        .expect("Static regex always has two groups")
+        .as_str();
+
+    if templates.is_empty() {
+        return (String::new(), class_name.to_string(), HashMap::new());
+    }
+
+    let templates: Vec<String> = split_templates(templates);
+    let mut templates_string = "template <".to_string();
+    let mut templates_map: HashMap<String, String> = HashMap::new();
+
+    for (i, template) in templates.iter().enumerate() {
+        let identifier = number_to_template_type_name(i);
+
+        templates_string.push_str("typename ");
+        templates_string.push_str(&identifier);
+        templates_string.push(',');
+        templates_string.push(' ');
+
+        templates_map.insert(identifier, template.to_owned());
+    }
+    templates_string.pop(); // remove the last space
+    templates_string.pop(); // remove the last comma
+    templates_string.push('>');
+    templates_string.push(' ');
+
+    (
+        templates_string,
+        class_name_without_templates.to_string(),
+        templates_map,
+    )
+}
+
 struct Class<'p> {
     data: pdb::ClassType<'p>,
     base_classes: Vec<String>,
@@ -399,18 +519,16 @@ impl<'p> Class<'p> {
     }
 
     fn as_string(&mut self, type_finder: &'p pdb::TypeFinder) -> String {
-        let mut name = format!(
-            "{} {}",
-            match self.data.kind {
-                pdb::ClassKind::Class => "class",
-                pdb::ClassKind::Struct => "struct",
-                pdb::ClassKind::Interface => "interface", // when can this happen?
-            },
-            self.data.name.to_string()
-        );
+        let name = self.data.name.to_string().into_owned();
+        let (templates, name, templates_map) = parse_template_types(&name);
+        let kind = match self.data.kind {
+            pdb::ClassKind::Class => "class",
+            pdb::ClassKind::Struct => "struct",
+            pdb::ClassKind::Interface => "interface", // when can this happen?
+        };
 
         if self.data.properties.forward_reference() {
-            return name.to_string();
+            return format!("{templates}{kind} {name}");
         }
 
         let mut fields: Vec<String> = Vec::new();
@@ -434,16 +552,21 @@ impl<'p> Class<'p> {
             }
         }
 
+        let mut base_classes = String::new();
         if !self.base_classes.is_empty() {
             for (i, base) in self.base_classes.iter().enumerate() {
                 let prefix = if i == 0 { ':' } else { ',' };
-                name.push_str(&format!("{prefix} {base}"));
+                base_classes.push_str(&format!("{prefix} {base}"));
             }
         }
 
-        let fields = do_indent(&fields.join("\n"));
+        let mut fields = do_indent(&fields.join("\n"));
+        for (identifier, template) in templates_map {
+            fields = fields.replace(&template, &identifier);
+        }
+
         format!(
-            "{}{name} {{\n{fields}\n}}",
+            "{}{templates}{kind} {name}{base_classes} {{\n{fields}\n}}",
             stringify_properties(self.data.properties)
         )
     }
@@ -608,7 +731,7 @@ pub fn decompile_forward_refrences(
     type_finder: &pdb::TypeFinder<'_>,
     type_information: &pdb::TypeInformation,
 ) -> String {
-    let mut forward_refrences = Vec::new();
+    let mut forward_refrences = HashSet::new();
 
     let _ = type_information.iter().for_each(|symbol| {
         let type_index = symbol.index();
@@ -638,11 +761,12 @@ pub fn decompile_forward_refrences(
             .unwrap_or_else(|e| format!("/* error processing type index {type_index} {e}*/"));
         let forward_refrence = parse_namespaces(&forward_refrence, &name);
 
-        forward_refrences.push(forward_refrence);
+        forward_refrences.insert(forward_refrence);
 
         Ok(())
     });
 
+    let mut forward_refrences: Vec<String> = forward_refrences.into_iter().collect();
     forward_refrences.sort();
     let mut forward_refrences = forward_refrences.join("\n");
     forward_refrences.push('\n');
@@ -670,7 +794,7 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
     let mut i = 0;
     let delta = 87;
 
-    let mut header = String::new();
+    let mut classes_unions_and_enums: HashSet<String> = HashSet::new();
     let _ = type_information.iter().for_each(|symbol| {
         if i % delta == 0 {
             progressbar.inc(delta);
@@ -681,9 +805,8 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
         let data = match type_finder.find(type_index)?.parse() {
             Ok(data) => data,
             Err(e) => {
-                header.push_str(&format!(
-                    "/* error processing type index {symbol:?} {e}*/\n"
-                ));
+                classes_unions_and_enums
+                    .insert(format!("/* error processing type index {symbol:?} {e}*/\n"));
                 return Ok(());
             }
         };
@@ -710,32 +833,39 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
         let s = s.unwrap_or_else(|e| format!("/* error processing type index {type_index} {e}*/"));
         let s = parse_namespaces(&s, &name);
 
-        header.push_str(&s);
-        header.push('\n');
+        classes_unions_and_enums.insert(s);
         Ok(())
     });
+
+    let mut classes_unions_and_enums: Vec<String> = classes_unions_and_enums.into_iter().collect();
+    classes_unions_and_enums.sort();
+    let mut classes_unions_and_enums = classes_unions_and_enums.join("\n");
+    classes_unions_and_enums.push('\n');
 
     let forward_refrences = decompile_forward_refrences(&type_finder, &type_information);
 
     let mut typedefs_str = String::new();
     for (from, to) in typedefs() {
-        let old_length = header.len();
-        header = header.replace(from, to);
-        let new_length = header.len();
+        let old_length = classes_unions_and_enums.len();
+        classes_unions_and_enums = classes_unions_and_enums.replace(from, to);
+        let new_length = classes_unions_and_enums.len();
         let savings = old_length - new_length;
         println!("{to} typedef saved {savings} bytes");
         typedefs_str.push_str(&format!("// typedef {from} {to};\n"));
     }
-    header = format!("// automatically generated by pdb2hpp\n// do not edit\n\n{includes}\n\n{forward_refrences}\n\n{typedefs_str}\n{header}");
+    classes_unions_and_enums = format!("// automatically generated by pdb2hpp\n// do not edit\n\n{includes}\n\n{typedefs_str}\n\n{forward_refrences}\n{classes_unions_and_enums}");
 
-    println!("Writing to structs.hpp. File size: {} bytes.", header.len());
+    println!(
+        "Writing to structs.hpp. File size: {} bytes.",
+        classes_unions_and_enums.len()
+    );
     let mut hpp = File::create("./src/structs.hpp")?;
-    hpp.write_all(header.as_bytes())?;
+    hpp.write_all(classes_unions_and_enums.as_bytes())?;
     println!("Structs.hpp creation succeeded.");
 
     println!("Using bindgen to generate structs.rs");
     let bindings = bindgen::Builder::default()
-        .header_contents("structs.hpp", &header)
+        .header_contents("structs.hpp", &classes_unions_and_enums)
         .rust_target(bindgen::RustTarget::Nightly)
         .generate()?;
 
