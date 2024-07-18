@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 
-use pdb::FallibleIterator;
+use pdb::{FallibleIterator, RawString};
 
 fn primitive_name(data: pdb::PrimitiveType) -> String {
     #[allow(clippy::match_same_arms)]
@@ -380,12 +380,28 @@ fn convert_pdb_data_to_cpp_code(
                 }
             }
         }
-        pdb::TypeData::MemberFunction(data) => format!("todo! MemberFunction {data:?}"),
+        pdb::TypeData::MemberFunction(data) => Method {
+            name: RawString::from(""), // todo!
+            return_type_name: type_index_to_string(type_finder, data.return_type),
+            arguments: argument_list(type_finder, data.argument_list)?,
+            attributes: data.attributes,
+            is_virtual: false,
+            is_static: false,
+        }
+        .as_string(),
         pdb::TypeData::VirtualBaseClass(data) => format!("todo! VirtualBaseClass {data:?}"),
         pdb::TypeData::VirtualFunctionTablePointer(data) => {
-            format!("todo! VirtualFunctionTablePointer {data:?}")
+            let s = convert_pdb_data_to_cpp_code_from_index(type_finder, data.table, base_classes)?;
+            format!("{s}*")
         }
-        pdb::TypeData::Bitfield(data) => format!("todo! Bitfield {data:?}"),
+        pdb::TypeData::Bitfield(data) => {
+            let s = convert_pdb_data_to_cpp_code_from_index(
+                type_finder,
+                data.underlying_type,
+                base_classes,
+            )?;
+            format!("{} : {}", s, data.length)
+        }
         pdb::TypeData::ArgumentList(data) => format!("todo! ArgumentList {data:?}"),
         pdb::TypeData::MethodList(data) => format!("todo! MethodList {data:?}"),
         _ => todo!(),
@@ -598,15 +614,6 @@ impl Field {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct Method<'p> {
-    name: pdb::RawString<'p>,
-    return_type_name: String,
-    arguments: Vec<String>,
-    is_virtual: bool,
-    is_static: bool,
-}
-
 fn type_index_to_string(type_finder: &pdb::TypeFinder<'_>, type_index: pdb::TypeIndex) -> String {
     match type_finder.find(type_index) {
         Ok(t) => match t.parse() {
@@ -646,6 +653,108 @@ fn type_index_to_string(type_finder: &pdb::TypeFinder<'_>, type_index: pdb::Type
     }
 }
 
+#[allow(non_camel_case_types)]
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Calling conventions for functions.
+/// <https://learn.microsoft.com/en-us/visualstudio/debugger/debug-interface-access/cv-call-e?view=vs-2022>
+pub enum CvCallE {
+    CV_CALL_NEAR_C = 0x00,      // near right to left push, caller pops stack
+    CV_CALL_FAR_C = 0x01,       // far right to left push, caller pops stack
+    CV_CALL_NEAR_PASCAL = 0x02, // near left to right push, callee pops stack
+    CV_CALL_FAR_PASCAL = 0x03,  // far left to right push, callee pops stack
+    CV_CALL_NEAR_FAST = 0x04,   // near left to right push with regs, callee pops stack
+    CV_CALL_FAR_FAST = 0x05,    // far left to right push with regs, callee pops stack
+    CV_CALL_SKIPPED = 0x06,     // skipped (unused) call index
+    CV_CALL_NEAR_STD = 0x07,    // near standard call
+    CV_CALL_FAR_STD = 0x08,     // far standard call
+    CV_CALL_NEAR_SYS = 0x09,    // near sys call
+    CV_CALL_FAR_SYS = 0x0a,     // far sys call
+    CV_CALL_THISCALL = 0x0b,    // this call (this passed in register)
+    CV_CALL_MIPSCALL = 0x0c,    // Mips call
+    CV_CALL_GENERIC = 0x0d,     // Generic call sequence
+    CV_CALL_ALPHACALL = 0x0e,   // Alpha call
+    CV_CALL_PPCCALL = 0x0f,     // PPC call
+    CV_CALL_SHCALL = 0x10,      // Hitachi SuperH call
+    CV_CALL_ARMCALL = 0x11,     // ARM call
+    CV_CALL_AM33CALL = 0x12,    // AM33 call
+    CV_CALL_TRICALL = 0x13,     // TriCore Call
+    CV_CALL_SH5CALL = 0x14,     // Hitachi SuperH-5 call
+    CV_CALL_M32RCALL = 0x15,    // M32R Call
+    CV_CALL_CLRCALL = 0x16,     // clr call
+    CV_CALL_INLINE = 0x17,      // Marker for routines always inlined and thus lacking a convention
+    CV_CALL_NEAR_VECTOR = 0x18, // near left to right push with regs, callee pops stack
+    CV_CALL_SWIFT = 0x19,       // Swift calling convention
+    CV_CALL_RESERVED = 0x20,    // first unused call enumeration
+
+                                // Do NOT add any more machine specific conventions.  This is to be used for
+                                // calling conventions in the source only (e.g. __cdecl, __stdcall).
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CallingConvention(u8);
+
+impl CallingConvention {
+    /// Returns the calling convention as a C++ string.
+    /// <https://learn.microsoft.com/en-us/cpp/cpp/argument-passing-and-naming-conventions?view=msvc-170>
+    pub fn as_cpp(self) -> &'static str {
+        let cv = self.as_cvcall();
+        match cv {
+            CvCallE::CV_CALL_NEAR_C => "", // This is __cdecl. It's the default, so we don't need to specify it.
+            CvCallE::CV_CALL_NEAR_FAST => "__fastcall ",
+            CvCallE::CV_CALL_NEAR_STD => "__stdcall ",
+            CvCallE::CV_CALL_NEAR_SYS => "__syscall ",
+            CvCallE::CV_CALL_THISCALL => "__thiscall ",
+            CvCallE::CV_CALL_CLRCALL => "__clrcall ",
+            CvCallE::CV_CALL_NEAR_VECTOR => "__vectorcall ",
+            _ => todo!("Unsupported calling convention: {cv:?}: {}", self.0),
+        }
+    }
+
+    pub fn as_cvcall(self) -> CvCallE {
+        match self.0 {
+            0x00 => CvCallE::CV_CALL_NEAR_C,
+            0x01 => CvCallE::CV_CALL_FAR_C,
+            0x02 => CvCallE::CV_CALL_NEAR_PASCAL,
+            0x03 => CvCallE::CV_CALL_FAR_PASCAL,
+            0x04 => CvCallE::CV_CALL_NEAR_FAST,
+            0x05 => CvCallE::CV_CALL_FAR_FAST,
+            0x06 => CvCallE::CV_CALL_SKIPPED,
+            0x07 => CvCallE::CV_CALL_NEAR_STD,
+            0x08 => CvCallE::CV_CALL_FAR_STD,
+            0x09 => CvCallE::CV_CALL_NEAR_SYS,
+            0x0a => CvCallE::CV_CALL_FAR_SYS,
+            0x0b => CvCallE::CV_CALL_THISCALL,
+            0x0c => CvCallE::CV_CALL_MIPSCALL,
+            0x0d => CvCallE::CV_CALL_GENERIC,
+            0x0e => CvCallE::CV_CALL_ALPHACALL,
+            0x0f => CvCallE::CV_CALL_PPCCALL,
+            0x10 => CvCallE::CV_CALL_SHCALL,
+            0x11 => CvCallE::CV_CALL_ARMCALL,
+            0x12 => CvCallE::CV_CALL_AM33CALL,
+            0x13 => CvCallE::CV_CALL_TRICALL,
+            0x14 => CvCallE::CV_CALL_SH5CALL,
+            0x15 => CvCallE::CV_CALL_M32RCALL,
+            0x16 => CvCallE::CV_CALL_CLRCALL,
+            0x17 => CvCallE::CV_CALL_INLINE,
+            0x18 => CvCallE::CV_CALL_NEAR_VECTOR,
+            0x19 => CvCallE::CV_CALL_SWIFT,
+            0x20 => CvCallE::CV_CALL_RESERVED,
+            _ => panic!("Unknown calling convention: {}", self.0),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Method<'p> {
+    name: pdb::RawString<'p>,
+    return_type_name: String,
+    arguments: Vec<String>,
+    attributes: pdb::FunctionAttributes,
+    is_virtual: bool,
+    is_static: bool,
+}
+
 impl<'p> Method<'p> {
     fn new(
         type_finder: &pdb::TypeFinder<'p>,
@@ -659,6 +768,7 @@ impl<'p> Method<'p> {
                     name,
                     return_type_name: type_index_to_string(type_finder, data.return_type),
                     arguments: argument_list(type_finder, data.argument_list)?,
+                    attributes: data.attributes,
                     is_virtual: attributes.is_virtual(),
                     is_static: attributes.is_static(),
                 };
@@ -675,13 +785,21 @@ impl<'p> Method<'p> {
     }
 
     fn as_string(&self) -> String {
+        let return_type = if self.attributes.is_constructor() {
+            ""
+        } else {
+            &format!("{} ", self.return_type_name)
+        };
+
+        let name = self.name.to_string();
+        let arguments = self.arguments.join(", ");
+
+        let calling_convention = CallingConvention(self.attributes.calling_convention()).as_cpp();
+
         format!(
-            "{}{}{} {}({})",
+            "{}{}{return_type}{calling_convention}{name}({arguments})",
             if self.is_static { "static " } else { "" },
             if self.is_virtual { "virtual " } else { "" },
-            self.return_type_name,
-            self.name.to_string(),
-            self.arguments.join(", ")
         )
     }
 }
