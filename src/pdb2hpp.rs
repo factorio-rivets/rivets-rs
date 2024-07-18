@@ -269,11 +269,14 @@ fn convert_pdb_data_to_cpp_code(
             }
             if let Some(continuation) = data.continuation {
                 // recurse
-                fields.push(format!("{};", convert_pdb_data_to_cpp_code_from_index(
-                    type_finder,
-                    continuation,
-                    base_classes,
-                )?));
+                fields.push(format!(
+                    "{};",
+                    convert_pdb_data_to_cpp_code_from_index(
+                        type_finder,
+                        continuation,
+                        base_classes,
+                    )?
+                ));
             }
             fields.join("\n")
         }
@@ -316,11 +319,11 @@ fn convert_pdb_data_to_cpp_code(
             let fields =
                 convert_pdb_data_to_cpp_code_from_index(type_finder, data.fields, base_classes)?;
             let fields = do_indent(&fields);
+            let underlying_type = type_index_to_string(type_finder, data.underlying_type);
 
             format!(
-                "{}enum {type_name} /* stored as {} */ {{\n{fields}\n}}",
+                "{}enum class {type_name} : {underlying_type} {{\n{fields}\n}}",
                 stringify_properties(data.properties),
-                data.underlying_type,
             )
         }
         pdb::TypeData::Pointer(data) => {
@@ -894,18 +897,20 @@ pub fn decompile_forward_refrences(
             pdb::TypeData::Class(data)
                 if data.properties.forward_reference()
                     && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() => data.name.to_string(),
+                    && !data.properties.scoped_definition() =>
+            {
+                data.name.to_string()
+            }
             pdb::TypeData::Union(data)
                 if data.properties.forward_reference()
                     && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() => data.name.to_string(),
-            pdb::TypeData::Enumeration(data)
-                if data.properties.forward_reference()
-                    && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() => data.name.to_string(),
+                    && !data.properties.scoped_definition() =>
+            {
+                data.name.to_string()
+            }
             _ => return Ok(()),
         };
-        
+
         let forward_refrence = convert_pdb_data_to_cpp_code(type_finder, data, &mut Vec::new());
         let forward_refrence = forward_refrence
             .unwrap_or_else(|e| format!("/* error processing type index {type_index} {e}*/"));
@@ -951,7 +956,8 @@ fn decompile_classes_unions_and_enums(
     type_information: &pdb::TypeInformation,
     lambda_names: &mut Vec<String>,
 ) -> String {
-    let mut classes_unions_and_enums: HashSet<String> = HashSet::new();
+    let mut enums: HashSet<String> = HashSet::new();
+    let mut classes_and_unions: HashSet<String> = HashSet::new();
 
     let progressbar = indicatif::ProgressBar::new(type_information.len() as u64);
     let mut i = 0;
@@ -972,19 +978,30 @@ fn decompile_classes_unions_and_enums(
             return Ok(());
         }
 
+        let mut is_enum = false;
         let name = match &data {
             pdb::TypeData::Class(data)
                 if !data.properties.forward_reference()
                     && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() => data.name.to_string(),
+                    && !data.properties.scoped_definition() =>
+            {
+                data.name.to_string()
+            }
             pdb::TypeData::Union(data)
                 if !data.properties.forward_reference()
                     && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() => data.name.to_string(),
+                    && !data.properties.scoped_definition() =>
+            {
+                data.name.to_string()
+            }
             pdb::TypeData::Enumeration(data)
                 if !data.properties.forward_reference()
                     && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() => data.name.to_string(),
+                    && !data.properties.scoped_definition() =>
+            {
+                is_enum = true;
+                data.name.to_string()
+            }
             _ => return Ok(()),
         };
 
@@ -993,13 +1010,22 @@ fn decompile_classes_unions_and_enums(
         let s = parse_namespaces(&s, &name);
         let s = parse_lambdas(&s, lambda_names);
 
-        classes_unions_and_enums.insert(s);
+        if is_enum {
+            enums.insert(s);
+        } else {
+            classes_and_unions.insert(s);
+        }
 
         Ok(())
     });
 
-    let mut classes_unions_and_enums: Vec<String> = classes_unions_and_enums.into_iter().collect();
-    classes_unions_and_enums.sort();
+    let mut enums: Vec<String> = enums.into_iter().collect();
+    enums.sort();
+    let mut classes_and_unions: Vec<String> = classes_and_unions.into_iter().collect();
+    classes_and_unions.sort();
+
+    let mut classes_unions_and_enums = enums;
+    classes_unions_and_enums.append(&mut classes_and_unions);
     let mut classes_unions_and_enums = classes_unions_and_enums.join("\n");
     classes_unions_and_enums.push('\n');
     classes_unions_and_enums
@@ -1019,7 +1045,8 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
     }
 
     let mut lambda_names = Vec::new();
-    let mut classes_unions_and_enums = decompile_classes_unions_and_enums(&type_finder, &type_information, &mut lambda_names);
+    let mut classes_unions_and_enums =
+        decompile_classes_unions_and_enums(&type_finder, &type_information, &mut lambda_names);
     let forward_refrences =
         decompile_forward_refrences(&type_finder, &type_information, &mut lambda_names);
 
@@ -1048,13 +1075,13 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
         format!("lambda_{i}")
     }).into_owned();
 
-    header_file = regex!("<unnamed-type-(.+?)>")
+    header_file = regex!("<unnamed-(type|enum)-(.+?)>")
         .replace_all(&header_file, |captures: &regex::Captures| {
-            let name = captures
-                .get(1)
+            captures
+                .get(2)
                 .expect("Compiled regex will always have a capture group")
-                .as_str();
-            format!("unnamed_type_{name}")
+                .as_str()
+                .to_owned()
         })
         .into_owned();
 
