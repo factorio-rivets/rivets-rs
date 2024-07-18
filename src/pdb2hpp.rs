@@ -11,51 +11,52 @@ use pdb::{FallibleIterator, RawString};
 fn primitive_name(data: pdb::PrimitiveType) -> String {
     #[allow(clippy::match_same_arms)]
     let mut name = match data.kind {
-        pdb::PrimitiveKind::Void => "void".to_string(),
-        pdb::PrimitiveKind::Char => "char".to_string(),
-        pdb::PrimitiveKind::UChar => "unsigned char".to_string(),
-        pdb::PrimitiveKind::I8 => "int8_t".to_string(),
-        pdb::PrimitiveKind::U8 => "uint8_t".to_string(),
-        pdb::PrimitiveKind::I16 => "int16_t".to_string(),
-        pdb::PrimitiveKind::U16 => "uint16_t".to_string(),
-        pdb::PrimitiveKind::I32 => "int32_t".to_string(),
-        pdb::PrimitiveKind::U32 => "uint32_t".to_string(),
-        pdb::PrimitiveKind::I64 => "int64_t".to_string(),
-        pdb::PrimitiveKind::U64 => "uint64_t".to_string(),
-        pdb::PrimitiveKind::F32 => "float".to_string(),
-        pdb::PrimitiveKind::F64 => "double".to_string(),
-        pdb::PrimitiveKind::Bool8 => "bool".to_string(),
+        pdb::PrimitiveKind::Void => "void",
+        pdb::PrimitiveKind::Char => "char",
+        pdb::PrimitiveKind::UChar => "unsigned char",
+        pdb::PrimitiveKind::I8 => "int8_t",
+        pdb::PrimitiveKind::U8 => "uint8_t",
+        pdb::PrimitiveKind::I16 => "int16_t",
+        pdb::PrimitiveKind::U16 => "uint16_t",
+        pdb::PrimitiveKind::I32 => "int32_t",
+        pdb::PrimitiveKind::U32 => "uint32_t",
+        pdb::PrimitiveKind::I64 => "int64_t",
+        pdb::PrimitiveKind::U64 => "uint64_t",
+        pdb::PrimitiveKind::F32 => "float",
+        pdb::PrimitiveKind::F64 => "double",
+        pdb::PrimitiveKind::Bool8 => "bool",
 
-        pdb::PrimitiveKind::NoType => "void".to_string(),
-        pdb::PrimitiveKind::RChar => "char".to_string(), // Assuming RChar is regular char
-        pdb::PrimitiveKind::WChar => "wchar_t".to_string(),
-        pdb::PrimitiveKind::RChar16 => "char16_t".to_string(),
-        pdb::PrimitiveKind::RChar32 => "char32_t".to_string(),
-        pdb::PrimitiveKind::Short => "short".to_string(),
-        pdb::PrimitiveKind::UShort => "unsigned short".to_string(),
-        pdb::PrimitiveKind::Long => "long".to_string(),
-        pdb::PrimitiveKind::ULong => "unsigned long".to_string(),
-        pdb::PrimitiveKind::Quad => "int64_t".to_string(), // Quad is typically 64-bit
-        pdb::PrimitiveKind::UQuad => "uint64_t".to_string(),
-        pdb::PrimitiveKind::Octa => "int128_t".to_string(), // Assuming Octa is 128-bit
-        pdb::PrimitiveKind::UOcta => "uint128_t".to_string(),
-        pdb::PrimitiveKind::I128 => "int128_t".to_string(),
-        pdb::PrimitiveKind::U128 => "uint128_t".to_string(),
-        pdb::PrimitiveKind::F16 => "__fp16".to_string(), // Assuming F16 is half-precision floating-point
-        pdb::PrimitiveKind::F32PP => "float _Complex".to_string(), // Assuming F32PP is complex float
-        pdb::PrimitiveKind::F48 => "float _Complex".to_string(), // Assuming F48 is complex float (needs confirmation)
-        pdb::PrimitiveKind::F80 => "long double".to_string(),
-        pdb::PrimitiveKind::F128 => "__float128".to_string(), // Quad-precision floating-point
-        pdb::PrimitiveKind::Complex32 => "_Complex float".to_string(),
-        pdb::PrimitiveKind::Complex64 => "_Complex double".to_string(),
-        pdb::PrimitiveKind::Complex80 => "_Complex long double".to_string(),
-        pdb::PrimitiveKind::Complex128 => "_Complex __float128".to_string(), // Assuming complex quad-precision
-        pdb::PrimitiveKind::Bool16 => "_Bool16".to_string(), // Assuming 16-bit boolean
-        pdb::PrimitiveKind::Bool32 => "_Bool32".to_string(), // Assuming 32-bit boolean
-        pdb::PrimitiveKind::Bool64 => "_Bool64".to_string(), // Assuming 64-bit boolean
-        pdb::PrimitiveKind::HRESULT => "HRESULT".to_string(),
+        pdb::PrimitiveKind::NoType => "void",
+        pdb::PrimitiveKind::RChar => "char", // Assuming RChar is regular char
+        pdb::PrimitiveKind::WChar => "wchar_t",
+        pdb::PrimitiveKind::RChar16 => "char16_t",
+        pdb::PrimitiveKind::RChar32 => "char32_t",
+        pdb::PrimitiveKind::Short => "short",
+        pdb::PrimitiveKind::UShort => "unsigned short",
+        pdb::PrimitiveKind::Long => "long",
+        pdb::PrimitiveKind::ULong => "unsigned long",
+        pdb::PrimitiveKind::Quad => "int64_t", // Quad is typically 64-bit
+        pdb::PrimitiveKind::UQuad => "uint64_t",
+        pdb::PrimitiveKind::Octa => "int128_t", // Assuming Octa is 128-bit
+        pdb::PrimitiveKind::UOcta => "uint128_t",
+        pdb::PrimitiveKind::I128 => "int128_t",
+        pdb::PrimitiveKind::U128 => "uint128_t",
+        pdb::PrimitiveKind::F16 => "__fp16", // Assuming F16 is half-precision floating-point
+        pdb::PrimitiveKind::F32PP => "float _Complex", // Assuming F32PP is complex float
+        pdb::PrimitiveKind::F48 => "float _Complex", // Assuming F48 is complex float (needs confirmation)
+        pdb::PrimitiveKind::F80 => "long double",
+        pdb::PrimitiveKind::F128 => "__float128", // Quad-precision floating-point
+        pdb::PrimitiveKind::Complex32 => "_Complex float",
+        pdb::PrimitiveKind::Complex64 => "_Complex double",
+        pdb::PrimitiveKind::Complex80 => "_Complex long double",
+        pdb::PrimitiveKind::Complex128 => "_Complex __float128", // Assuming complex quad-precision
+        pdb::PrimitiveKind::Bool16 => "_Bool16",                 // Assuming 16-bit boolean
+        pdb::PrimitiveKind::Bool32 => "_Bool32",                 // Assuming 32-bit boolean
+        pdb::PrimitiveKind::Bool64 => "_Bool64",                 // Assuming 64-bit boolean
+        pdb::PrimitiveKind::HRESULT => "HRESULT",
         _ => panic!("Unknown primitive type {:?}", data.kind),
-    };
+    }
+    .to_string();
 
     if data.indirection.is_some() {
         name.push('*');
@@ -64,15 +65,25 @@ fn primitive_name(data: pdb::PrimitiveType) -> String {
     name
 }
 
-struct FieldAttributes(pdb::FieldAttributes, bool);
+struct FieldAttributes {
+    attributes: pdb::FieldAttributes,
+    is_virtual: bool,
+}
 
 impl FieldAttributes {
     fn as_string(&self) -> String {
-        let mut s = String::new();
-        if self.0.is_static() {
+        let mut s = match self.attributes.access() {
+            1 => "private ",
+            2 => "protected ",
+            3 => "public ",
+            _ => "",
+        }
+        .to_string();
+
+        if self.attributes.is_static() {
             s = format!("static {s}");
         }
-        if self.1 || self.0.is_virtual() || self.0.is_pure_virtual() {
+        if self.is_virtual || self.attributes.is_virtual() || self.attributes.is_pure_virtual() {
             s = format!("virtual {s}");
         }
         s
@@ -217,7 +228,11 @@ fn convert_pdb_data_to_cpp_code(
         }
 
         pdb::TypeData::BaseClass(data) => {
-            let attributes = FieldAttributes(data.attributes, false).as_string();
+            let attributes = FieldAttributes {
+                attributes: data.attributes,
+                is_virtual: false,
+            }
+            .as_string();
             let type_name = type_index_to_string(type_finder, data.base_class);
 
             base_classes.push(format!("{attributes}{type_name}"));
@@ -350,7 +365,14 @@ fn convert_pdb_data_to_cpp_code(
                 data.nested_type,
                 base_classes,
             )?;
-            format!("{}{s}", FieldAttributes(data.attributes, false).as_string())
+            format!(
+                "{}{s}",
+                FieldAttributes {
+                    attributes: data.attributes,
+                    is_virtual: false
+                }
+                .as_string()
+            )
         }
         pdb::TypeData::Method(data) => {
             Method::new(type_finder, data.name, data.attributes, data.method_type)?.as_string()
@@ -428,13 +450,13 @@ fn split_templates(templates: &str) -> Vec<String> {
 
     for char in chars {
         match char {
-            '<' => {
+            '<' | '(' => {
                 template_depth += 1;
-                current.push('<');
+                current.push(char);
             }
-            '>' => {
+            '>' | ')' => {
                 template_depth -= 1;
-                current.push('>');
+                current.push(char);
             }
             ',' if template_depth == 0 => {
                 result.push(current.clone());
@@ -492,7 +514,11 @@ fn parse_template_types(class_name: &str) -> (String, String, HashMap<String, St
         .as_str();
 
     if templates.is_empty() {
-        return (String::new(), class_name.to_string(), HashMap::new());
+        return (
+            String::new(),
+            class_name_without_templates.to_string(),
+            HashMap::new(),
+        );
     }
 
     let templates: Vec<String> = split_templates(templates);
