@@ -1,4 +1,5 @@
 #![allow(clippy::expect_used)]
+#![allow(clippy::trivial_regex)]
 
 use anyhow::Result;
 use core::panic;
@@ -255,7 +256,7 @@ fn convert_pdb_data_to_cpp_code(
             // A list of fields inside a class
             let mut fields: Vec<String> = Vec::new();
             for field in data.fields {
-                let err = format!("/* field type not found: {field:?} */");
+                let err = format!("todo! field type not found: {field:?}");
                 let is_enumerate = matches!(field, pdb::TypeData::Enumerate(_));
                 let mut s = convert_pdb_data_to_cpp_code(type_finder, field.clone(), base_classes)
                     .unwrap_or(err);
@@ -809,13 +810,15 @@ impl<'p> Method<'p> {
     }
 
     fn as_string(&self) -> String {
-        let return_type = if self.attributes.is_constructor() {
+        let name = self.name.to_string();
+        let is_destructor = name.starts_with('~');
+
+        let return_type = if is_destructor || self.attributes.is_constructor() {
             ""
         } else {
             &format!("{} ", self.return_type_name)
         };
 
-        let name = self.name.to_string();
         let arguments = self.arguments.join(", ");
 
         let calling_convention = CallingConvention(self.attributes.calling_convention()).as_cpp();
@@ -887,23 +890,22 @@ pub fn decompile_forward_refrences(
             return Ok(());
         }
 
-        match &data {
+        let name = match &data {
             pdb::TypeData::Class(data)
                 if data.properties.forward_reference()
                     && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() => {}
+                    && !data.properties.scoped_definition() => data.name.to_string(),
             pdb::TypeData::Union(data)
                 if data.properties.forward_reference()
                     && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() => {}
+                    && !data.properties.scoped_definition() => data.name.to_string(),
             pdb::TypeData::Enumeration(data)
                 if data.properties.forward_reference()
                     && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() => {}
+                    && !data.properties.scoped_definition() => data.name.to_string(),
             _ => return Ok(()),
-        }
-
-        let name = data.name().unwrap().to_string();
+        };
+        
         let forward_refrence = convert_pdb_data_to_cpp_code(type_finder, data, &mut Vec::new());
         let forward_refrence = forward_refrence
             .unwrap_or_else(|e| format!("/* error processing type index {type_index} {e}*/"));
@@ -940,7 +942,7 @@ fn parse_lambdas(header_file: &str, lambda_names: &mut Vec<String>) -> String {
 fn is_std_namespace(data: &pdb::TypeData<'_>) -> bool {
     data.name().map_or(true, |name| {
         let name = name.to_string();
-        name.starts_with("std::") || name == "MplVector"
+        name.starts_with("std::") || name.starts_with("MplVector<") || name.starts_with("Signal<")
     })
 }
 
@@ -970,22 +972,21 @@ fn decompile_classes_unions_and_enums(
             return Ok(());
         }
 
-        let name;
-        match &data {
+        let name = match &data {
             pdb::TypeData::Class(data)
                 if !data.properties.forward_reference()
                     && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() => name = data.name.to_string(),
+                    && !data.properties.scoped_definition() => data.name.to_string(),
             pdb::TypeData::Union(data)
                 if !data.properties.forward_reference()
                     && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() => name = data.name.to_string(),
+                    && !data.properties.scoped_definition() => data.name.to_string(),
             pdb::TypeData::Enumeration(data)
                 if !data.properties.forward_reference()
                     && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() => name = data.name.to_string(),
+                    && !data.properties.scoped_definition() => data.name.to_string(),
             _ => return Ok(()),
-        }
+        };
 
         let s = convert_pdb_data_to_cpp_code(type_finder, data, &mut Vec::new());
         let s = s.unwrap_or_else(|e| format!("/* error processing type index {type_index} {e}*/"));
