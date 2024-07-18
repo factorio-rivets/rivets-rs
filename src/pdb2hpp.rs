@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+
 use anyhow::Result;
 use core::panic;
 use lazy_regex::regex;
@@ -266,11 +268,11 @@ fn convert_pdb_data_to_cpp_code(
             }
             if let Some(continuation) = data.continuation {
                 // recurse
-                fields.push(convert_pdb_data_to_cpp_code_from_index(
+                fields.push(format!("{};", convert_pdb_data_to_cpp_code_from_index(
                     type_finder,
                     continuation,
                     base_classes,
-                )?);
+                )?));
             }
             fields.join("\n")
         }
@@ -395,7 +397,7 @@ fn convert_pdb_data_to_cpp_code(
 
                         s.push(method.as_string());
                     }
-                    s.join("\n")
+                    s.join(";\n")
                 }
                 other => {
                     format!("processing OverloadedMethod, expected MethodList, got {} -> {:?}. unexpected type in Class::add_field()", data.method_list, other)
@@ -501,13 +503,11 @@ fn parse_template_types(class_name: &str) -> (String, String, HashMap<String, St
         return (String::new(), class_name.to_string(), HashMap::new());
     };
 
-    #[allow(clippy::expect_used)]
     let class_name_without_templates = captures
         .get(1)
         .expect("Static regex always has one group")
         .as_str();
 
-    #[allow(clippy::expect_used)]
     let templates = captures
         .get(2)
         .expect("Static regex always has two groups")
@@ -531,11 +531,9 @@ fn parse_template_types(class_name: &str) -> (String, String, HashMap<String, St
         templates_string.push_str("typename ");
         templates_string.push_str(&identifier);
         templates_string.push(',');
-        templates_string.push(' ');
 
         templates_map.insert(identifier, template.to_owned());
     }
-    templates_string.pop(); // remove the last space
     templates_string.pop(); // remove the last comma
     templates_string.push('>');
     templates_string.push(' ');
@@ -875,6 +873,7 @@ fn typedefs() -> HashMap<&'static str, &'static str> {
 pub fn decompile_forward_refrences(
     type_finder: &pdb::TypeFinder<'_>,
     type_information: &pdb::TypeInformation,
+    lambda_names: &mut Vec<String>,
 ) -> String {
     let mut forward_refrences = HashSet::new();
 
@@ -883,6 +882,10 @@ pub fn decompile_forward_refrences(
         let Ok(data) = type_finder.find(type_index)?.parse() else {
             return Ok(());
         };
+
+        if is_std_namespace(&data) {
+            return Ok(());
+        }
 
         match &data {
             pdb::TypeData::Class(data)
@@ -905,6 +908,7 @@ pub fn decompile_forward_refrences(
         let forward_refrence = forward_refrence
             .unwrap_or_else(|e| format!("/* error processing type index {type_index} {e}*/"));
         let forward_refrence = parse_namespaces(&forward_refrence, &name);
+        let forward_refrence = parse_lambdas(&forward_refrence, lambda_names);
 
         forward_refrences.insert(forward_refrence);
 
@@ -916,6 +920,88 @@ pub fn decompile_forward_refrences(
     let mut forward_refrences = forward_refrences.join("\n");
     forward_refrences.push('\n');
     forward_refrences
+}
+
+fn parse_lambdas(header_file: &str, lambda_names: &mut Vec<String>) -> String {
+    let header_file = regex!(r"<lambda_(\w+?)>")
+        .replace_all(header_file, |lambda_name: &regex::Captures| {
+            let lambda_name = lambda_name
+                .get(1)
+                .expect("Compiled regex will always have a capture group")
+                .as_str()
+                .to_owned();
+            lambda_names.push(lambda_name);
+            "__#@#LAMBDA@##__"
+        })
+        .into_owned();
+    header_file
+}
+
+fn is_std_namespace(data: &pdb::TypeData<'_>) -> bool {
+    data.name().map_or(true, |name| {
+        let name = name.to_string();
+        name.starts_with("std::") || name == "MplVector"
+    })
+}
+
+fn decompile_classes_unions_and_enums(
+    type_finder: &pdb::TypeFinder<'_>,
+    type_information: &pdb::TypeInformation,
+    lambda_names: &mut Vec<String>,
+) -> String {
+    let mut classes_unions_and_enums: HashSet<String> = HashSet::new();
+
+    let progressbar = indicatif::ProgressBar::new(type_information.len() as u64);
+    let mut i = 0;
+    let delta = 87;
+
+    let _ = type_information.iter().for_each(|symbol| {
+        i += 1;
+        if i % delta == 0 {
+            progressbar.inc(delta);
+        }
+
+        let type_index = symbol.index();
+        let Ok(data) = type_finder.find(type_index)?.parse() else {
+            return Ok(());
+        };
+
+        if is_std_namespace(&data) {
+            return Ok(());
+        }
+
+        let name;
+        match &data {
+            pdb::TypeData::Class(data)
+                if !data.properties.forward_reference()
+                    && !data.properties.is_nested_type()
+                    && !data.properties.scoped_definition() => name = data.name.to_string(),
+            pdb::TypeData::Union(data)
+                if !data.properties.forward_reference()
+                    && !data.properties.is_nested_type()
+                    && !data.properties.scoped_definition() => name = data.name.to_string(),
+            pdb::TypeData::Enumeration(data)
+                if !data.properties.forward_reference()
+                    && !data.properties.is_nested_type()
+                    && !data.properties.scoped_definition() => name = data.name.to_string(),
+            _ => return Ok(()),
+        }
+
+        let s = convert_pdb_data_to_cpp_code(type_finder, data, &mut Vec::new());
+        let s = s.unwrap_or_else(|e| format!("/* error processing type index {type_index} {e}*/"));
+        let s = parse_namespaces(&s, &name);
+        let s = parse_lambdas(&s, lambda_names);
+
+        classes_unions_and_enums.insert(s);
+
+        Ok(())
+    });
+
+    let mut classes_unions_and_enums: Vec<String> = classes_unions_and_enums.into_iter().collect();
+    classes_unions_and_enums.sort();
+    let mut classes_unions_and_enums = classes_unions_and_enums.join("\n");
+    classes_unions_and_enums.push('\n');
+    classes_unions_and_enums
 }
 
 pub fn generate(pdb_path: &Path) -> Result<()> {
@@ -931,63 +1017,10 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
         type_finder.update(&type_iter);
     }
 
-    let includes = ["<cstdint>"];
-    let includes: Vec<String> = includes.iter().map(|i| format!("#include {i}")).collect();
-    let includes = includes.join("\n");
-
-    let progressbar = indicatif::ProgressBar::new(type_information.len() as u64);
-    let mut i = 0;
-    let delta = 87;
-
-    let mut classes_unions_and_enums: HashSet<String> = HashSet::new();
-    let _ = type_information.iter().for_each(|symbol| {
-        if i % delta == 0 {
-            progressbar.inc(delta);
-        }
-        i += 1;
-
-        let type_index = symbol.index();
-        let data = match type_finder.find(type_index)?.parse() {
-            Ok(data) => data,
-            Err(e) => {
-                classes_unions_and_enums
-                    .insert(format!("/* error processing type index {symbol:?} {e}*/\n"));
-                return Ok(());
-            }
-        };
-
-        match &data {
-            // The type_information list contains all types, not just top-level types. We need to filter for only classes, unions, enums.
-            pdb::TypeData::Class(data)
-                if !data.properties.forward_reference()
-                    && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() => {}
-            pdb::TypeData::Union(data)
-                if !data.properties.forward_reference()
-                    && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() => {}
-            pdb::TypeData::Enumeration(data)
-                if !data.properties.forward_reference()
-                    && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() => {}
-            _ => return Ok(()),
-        }
-
-        let name = data.name().unwrap().to_string();
-        let s = convert_pdb_data_to_cpp_code(&type_finder, data, &mut Vec::new());
-        let s = s.unwrap_or_else(|e| format!("/* error processing type index {type_index} {e}*/"));
-        let s = parse_namespaces(&s, &name);
-
-        classes_unions_and_enums.insert(s);
-        Ok(())
-    });
-
-    let mut classes_unions_and_enums: Vec<String> = classes_unions_and_enums.into_iter().collect();
-    classes_unions_and_enums.sort();
-    let mut classes_unions_and_enums = classes_unions_and_enums.join("\n");
-    classes_unions_and_enums.push('\n');
-
-    let forward_refrences = decompile_forward_refrences(&type_finder, &type_information);
+    let mut lambda_names = Vec::new();
+    let mut classes_unions_and_enums = decompile_classes_unions_and_enums(&type_finder, &type_information, &mut lambda_names);
+    let forward_refrences =
+        decompile_forward_refrences(&type_finder, &type_information, &mut lambda_names);
 
     let mut typedefs_str = String::new();
     for (from, to) in typedefs() {
@@ -999,8 +1032,30 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
         typedefs_str.push_str(&format!("// typedef {from} {to};\n"));
     }
 
+    let includes = ["<cstdint>", "<chrono>", "<vector>", "<memory>"];
+    let includes: Vec<String> = includes.iter().map(|i| format!("#include {i}")).collect();
+    let includes = includes.join("\n");
+
     let header_file = format!("// automatically generated by pdb2hpp\n// do not edit\n\n{includes}\n\n{typedefs_str}\n\n{forward_refrences}\n{classes_unions_and_enums}");
-    let header_file = header_file.replace("`anonymous-namespace'", "anonymous");
+    let mut header_file = header_file.replace("`anonymous-namespace'", "anonymous");
+
+    let mut lambda_name_map = HashMap::new();
+    header_file = regex!("__#@#LAMBDA@##__").replace_all(&header_file, |_: &regex::Captures| {
+        let lambda_name = lambda_names.pop().expect("lambda_names will have the same length as the number of lambdas in the header file");
+        let len = lambda_name_map.len();
+        let i = lambda_name_map.entry(lambda_name).or_insert(len);
+        format!("lambda_{i}")
+    }).into_owned();
+
+    header_file = regex!("<unnamed-type-(.+?)>")
+        .replace_all(&header_file, |captures: &regex::Captures| {
+            let name = captures
+                .get(1)
+                .expect("Compiled regex will always have a capture group")
+                .as_str();
+            format!("unnamed_type_{name}")
+        })
+        .into_owned();
 
     println!(
         "Writing to structs.hpp. File size: {} bytes.",
