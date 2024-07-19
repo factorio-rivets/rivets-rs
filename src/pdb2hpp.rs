@@ -185,15 +185,25 @@ fn find_type<'a>(
 }
 
 struct DecompilationResult<'a> {
+    /// A multi-line string repersenting the c++ code that would generate this type
     repersentation: String,
+    /// The full type name including namespaces and template types. ie `std::vector<int>`
     name: String,
+    /// An interior-mutable set of all the types that this type depends on. Used for topological sorting.
+    /// This is required becuase clang expects all types to be defined before they are used.
     dependencies: RefCell<HashSet<String>>,
+    /// The type data from pdb crate that this result is based on.
+    /// This is an optional in order to handle pdb parsing errors.
     data: Option<pdb::TypeData<'a>>,
+    /// A borrowed refrence to a pdb crate type finder.
+    /// This type finder is shared across all `DecompilationResult` for a certian pdb file.
     type_finder: &'a pdb::TypeFinder<'a>,
+    /// An interior-mutable set of all the base classes that this class inherits from.
     base_classes: RefCell<HashSet<String>>,
 }
 
 impl<'a> DecompilationResult<'a> {
+    /// Constructor for decompilation result based on a `pdb::TypeData`.
     fn from_data(type_finder: &'a pdb::TypeFinder<'a>, data: pdb::TypeData<'a>) -> Self {
         let mut dc = DecompilationResult {
             repersentation: String::new(),
@@ -209,6 +219,7 @@ impl<'a> DecompilationResult<'a> {
         dc
     }
 
+    /// Constructor for decompilation result based on a `pdb::TypeIndex`.
     fn from_index(type_finder: &'a pdb::TypeFinder<'a>, type_index: pdb::TypeIndex) -> Self {
         match find_type(type_finder, type_index) {
             Ok(data) => DecompilationResult::from_data(type_finder, data),
@@ -257,7 +268,7 @@ impl<'a> DecompilationResult<'a> {
     fn calculate_repersentation(&mut self) {
         let type_finder = self.type_finder;
 
-        self.repersentation = match &mut self.data {
+        self.repersentation = match &self.data {
             Some(pdb::TypeData::Member(data)) => {
                 // A field inside a class
                 let dc = DecompilationResult::from_index(type_finder, data.field_type);
@@ -406,19 +417,10 @@ impl<'a> DecompilationResult<'a> {
                     dc.repersentation
                 )
             }
-            Some(pdb::TypeData::Method(data)) => match find_type(type_finder, data.method_type) {
-                Ok(pdb::TypeData::MemberFunction(member_function_data)) => method_to_string(
-                    type_finder,
-                    &data.name.to_string(),
-                    member_function_data.return_type,
-                    member_function_data.argument_list,
-                    member_function_data.attributes,
-                    Some(data.attributes),
-                ),
-                other => {
-                    format!("processing Method, expected MethodType, got {other:?}.")
-                }
-            },
+            Some(pdb::TypeData::Method(data)) => {
+                let dc = DecompilationResult::from_index(type_finder, data.method_type);
+                dc.method_to_string(&data.name.to_string(), Some(data.attributes))
+            }
             Some(pdb::TypeData::OverloadedMethod(data)) => {
                 // this just means we have more than one method with the same name
                 // find the method list
@@ -432,23 +434,8 @@ impl<'a> DecompilationResult<'a> {
                         } in method_list.methods
                         {
                             // hooray
-                            match find_type(type_finder, method_type) {
-                                Ok(pdb::TypeData::MemberFunction(member_function_data)) => {
-                                    s.push(method_to_string(
-                                        type_finder,
-                                        &data.name.to_string(),
-                                        member_function_data.return_type,
-                                        member_function_data.argument_list,
-                                        member_function_data.attributes,
-                                        Some(attributes),
-                                    ));
-                                }
-                                other => {
-                                    s.push(format!(
-                                        "processing OverloadedMethod, expected MethodList, got {other:?}."
-                                    ));
-                                }
-                            }
+                            let dc = DecompilationResult::from_index(type_finder, method_type);
+                            s.push(dc.method_to_string(&data.name.to_string(), Some(attributes)));
                         }
                         s.join(";\n")
                     }
@@ -457,14 +444,7 @@ impl<'a> DecompilationResult<'a> {
                     }
                 }
             }
-            Some(pdb::TypeData::MemberFunction(data)) => method_to_string(
-                type_finder,
-                "",
-                data.return_type,
-                data.argument_list,
-                data.attributes,
-                None,
-            ),
+            Some(pdb::TypeData::MemberFunction(_)) => self.method_to_string("", None),
             Some(pdb::TypeData::VirtualBaseClass(data)) => {
                 format!("todo! VirtualBaseClass {data:?}")
             }
@@ -522,13 +502,8 @@ impl<'a> DecompilationResult<'a> {
 
         if let Some(type_index) = data.fields {
             let dc = DecompilationResult::from_index(self.type_finder, type_index);
+            self.drain_dependencies(&dc);
             fields.push(dc.repersentation);
-            self.base_classes
-                .borrow_mut()
-                .extend(dc.base_classes.borrow_mut().drain());
-            self.dependencies
-                .borrow_mut()
-                .extend(dc.dependencies.borrow_mut().drain());
         }
 
         let mut base_classes = String::new();
@@ -547,6 +522,54 @@ impl<'a> DecompilationResult<'a> {
             "{}{templates}{kind} {name}{base_classes} {{\n{fields}\n}}",
             stringify_properties(data.properties)
         )
+    }
+
+    fn drain_dependencies(&self, other: &Self) {
+        self.dependencies
+            .borrow_mut()
+            .extend(other.dependencies.borrow_mut().drain());
+        self.base_classes
+            .borrow_mut()
+            .extend(other.base_classes.borrow_mut().drain());
+    }
+
+    fn method_to_string(
+        &self,
+        method_name: &str,
+        field_attributes: Option<pdb::FieldAttributes>,
+    ) -> String {
+        let Some(pdb::TypeData::MemberFunction(data)) = self.data else {
+            return format!("/* error processing method {method_name} */");
+        };
+
+        let return_type = data.return_type;
+        let arguments_list = data.argument_list;
+        let function_attributes = data.attributes;
+
+        let type_finder = self.type_finder;
+        let is_destructor = method_name.starts_with('~');
+
+        let return_type = if is_destructor || function_attributes.is_constructor() {
+            ""
+        } else {
+            let dc = DecompilationResult::from_index(type_finder, return_type);
+            &format!("{} ", dc.name)
+        };
+
+        let calling_convention =
+            CallingConvention(function_attributes.calling_convention()).as_cpp();
+        let field_attributes = field_attributes.map_or_else(String::new, |field_attributes| {
+            FieldAttributes {
+                attributes: field_attributes,
+                is_virtual: false,
+            }
+            .as_string()
+        });
+
+        let dc = DecompilationResult::from_index(type_finder, arguments_list);
+        let arguments = dc.repersentation;
+
+        format!("{field_attributes}{return_type}{calling_convention}{method_name}({arguments})",)
     }
 
     fn namespaced_repersentation(&self) -> String {
@@ -577,38 +600,6 @@ impl<'a> DecompilationResult<'a> {
     }
 }
 
-fn method_to_string(
-    type_finder: &pdb::TypeFinder<'_>,
-    method_name: &str,
-    return_type: pdb::TypeIndex,
-    arguments_list: pdb::TypeIndex,
-    function_attributes: pdb::FunctionAttributes,
-    field_attributes: Option<pdb::FieldAttributes>,
-) -> String {
-    let is_destructor = method_name.starts_with('~');
-
-    let return_type = if is_destructor || function_attributes.is_constructor() {
-        ""
-    } else {
-        let dc = DecompilationResult::from_index(type_finder, return_type);
-        &format!("{} ", dc.name)
-    };
-
-    let calling_convention = CallingConvention(function_attributes.calling_convention()).as_cpp();
-    let field_attributes = field_attributes.map_or_else(String::new, |field_attributes| {
-        FieldAttributes {
-            attributes: field_attributes,
-            is_virtual: false,
-        }
-        .as_string()
-    });
-
-    let dc = DecompilationResult::from_index(type_finder, arguments_list);
-    let arguments = dc.repersentation;
-
-    format!("{field_attributes}{return_type}{calling_convention}{method_name}({arguments})",)
-}
-
 /// We need to split template types by commas, however sometimes nested templates contain commas inside <>.
 /// This is a special implementation of the `split()` function to handle the above case.
 fn split_templates(templates: &str) -> Vec<String> {
@@ -629,8 +620,8 @@ fn split_templates(templates: &str) -> Vec<String> {
                 current.push(char);
             }
             ',' if template_depth == 0 => {
-                result.push(current.clone());
-                current.clear();
+                result.push(current);
+                current = String::with_capacity(32);
             }
             _ => {
                 current.push(char);
