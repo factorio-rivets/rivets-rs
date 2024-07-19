@@ -1,6 +1,7 @@
 use anyhow::{bail, Result};
 use core::panic;
 use lazy_regex::regex;
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Write;
@@ -132,7 +133,7 @@ fn stringify_properties(properties: pdb::TypeProperties) -> String {
     }
 }
 
-fn split_cpp_class_name(class_name: &str) -> Vec<String> {
+fn list_namespaces_as_vec(class_name: &str) -> Vec<String> {
     let mut result = Vec::new();
     let mut current = String::new();
     let mut template_depth = 0;
@@ -176,33 +177,6 @@ fn split_cpp_class_name(class_name: &str) -> Vec<String> {
     result
 }
 
-fn parse_namespaces(data_structure: &str, name: &str) -> String {
-    // this function executes after the template types have been calculated. remove everything after "<"
-    let name = name.split('<').next().unwrap_or_default();
-
-    let mut namespaces = split_cpp_class_name(name);
-    let short_name = namespaces.pop().unwrap_or_default();
-    if namespaces.is_empty() {
-        return format!("{data_structure};");
-    }
-
-    let data_structure = data_structure.replacen(name, &short_name, 1);
-
-    let mut namespaced_string = String::new();
-    for namespace in &namespaces {
-        namespaced_string.push_str("namespace ");
-        namespaced_string.push_str(namespace);
-        namespaced_string.push_str(" { ");
-    }
-    namespaced_string.push_str(&data_structure);
-    namespaced_string.push(';');
-    for _ in &namespaces {
-        namespaced_string.push_str(" }");
-    }
-    namespaced_string.push(';');
-    namespaced_string
-}
-
 fn find_type<'a>(
     type_finder: &pdb::TypeFinder<'a>,
     type_index: pdb::TypeIndex,
@@ -211,89 +185,84 @@ fn find_type<'a>(
 }
 
 struct DecompilationResult<'a> {
-    repersentation: Option<String>,
-    name: Option<String>,
-    dependancies: HashSet<String>,
+    repersentation: String,
+    name: String,
+    dependencies: RefCell<HashSet<String>>,
     data: Option<pdb::TypeData<'a>>,
     type_finder: &'a pdb::TypeFinder<'a>,
-    base_classes: Vec<String>,
+    base_classes: RefCell<HashSet<String>>,
 }
 
 impl<'a> DecompilationResult<'a> {
     fn from_data(type_finder: &'a pdb::TypeFinder<'a>, data: pdb::TypeData<'a>) -> Self {
-        DecompilationResult {
-            repersentation: None,
-            name: None,
-            dependancies: HashSet::new(),
+        let mut dc = DecompilationResult {
+            repersentation: String::new(),
+            name: String::new(),
+            dependencies: RefCell::new(HashSet::new()),
             data: Some(data),
             type_finder,
-            base_classes: Vec::new(),
-        }
+            base_classes: RefCell::new(HashSet::new()),
+        };
+
+        dc.calculate_name();
+        dc.calculate_repersentation();
+
+        dc
     }
 
     fn from_index(type_finder: &'a pdb::TypeFinder<'a>, type_index: pdb::TypeIndex) -> Self {
         match find_type(type_finder, type_index) {
             Ok(data) => DecompilationResult::from_data(type_finder, data),
             Err(e) => DecompilationResult {
-                repersentation: Some(format!("/* error processing type index {type_index} {e}*/")),
-                name: Some(format!("/* error processing type index {type_index} {e}*/")),
-                dependancies: HashSet::new(),
+                repersentation: format!("/* error processing type index {type_index} {e}*/"),
+                name: format!("/* error processing type index {type_index} {e}*/"),
+                dependencies: RefCell::new(HashSet::new()),
                 data: None,
                 type_finder,
-                base_classes: Vec::new(),
+                base_classes: RefCell::new(HashSet::new()),
             },
         }
     }
 
-    fn name(&mut self) -> &str {
-        if let Some(ref name) = self.name {
-            return name;
-        }
-
+    fn calculate_name(&mut self) {
         let type_finder = self.type_finder;
 
-        self.name = Some(match &self.data {
+        self.name = match &self.data {
             Some(pdb::TypeData::Pointer(data)) => {
-                let mut dc = DecompilationResult::from_index(type_finder, data.underlying_type);
-                format!("{}*", dc.name())
+                let dc = DecompilationResult::from_index(type_finder, data.underlying_type);
+                format!("{}*", dc.name)
             }
 
             Some(pdb::TypeData::Modifier(data)) => {
-                let mut dc = DecompilationResult::from_index(type_finder, data.underlying_type);
-                format!("{}{}", modifier_string(*data), dc.name())
+                let dc = DecompilationResult::from_index(type_finder, data.underlying_type);
+                format!("{}{}", modifier_string(*data), dc.name)
             }
 
             Some(data) => match data.name() {
                 Some(name) => name.to_string().into_owned(),
-                None => return self.repersentation(),
+                None => self.repersentation.clone(),
             },
 
-            _ => return self.repersentation(),
-        });
-
-        self.name()
+            _ => self.repersentation.clone(),
+        };
     }
 
     #[allow(clippy::too_many_lines)]
-    fn repersentation(&mut self) -> &str {
-        if let Some(ref repersentation) = self.repersentation {
-            return repersentation;
-        }
-
+    fn calculate_repersentation(&mut self) {
         let type_finder = self.type_finder;
 
-        self.repersentation = Some(match &mut self.data {
+        self.repersentation = match &mut self.data {
             Some(pdb::TypeData::Member(data)) => {
                 // A field inside a class
-                let mut dc = DecompilationResult::from_index(type_finder, data.field_type);
+                let dc = DecompilationResult::from_index(type_finder, data.field_type);
                 let offset = data.offset;
-                let field_type = dc.name();
+                let field_type = dc.name;
                 let field_name = data.name.to_string();
                 format!("/* offset {offset:3} */ {field_type} {field_name}")
             }
             Some(pdb::TypeData::StaticMember(data)) => {
-                let mut dc = DecompilationResult::from_index(type_finder, data.field_type);
-                format!("static {}", dc.repersentation())
+                let dc = DecompilationResult::from_index(type_finder, data.field_type);
+                format!("static {}", dc.repersentation)
             }
             Some(pdb::TypeData::BaseClass(data)) => {
                 let attributes = FieldAttributes {
@@ -301,10 +270,12 @@ impl<'a> DecompilationResult<'a> {
                     is_virtual: false,
                 }
                 .as_string();
-                let mut dc = DecompilationResult::from_index(type_finder, data.base_class);
-                let type_name = dc.name();
+                let dc = DecompilationResult::from_index(type_finder, data.base_class);
+                let type_name = dc.name;
 
-                self.base_classes.push(format!("{attributes}{type_name}"));
+                self.base_classes
+                    .get_mut()
+                    .insert(format!("{attributes}{type_name}"));
 
                 format!(
                     "/* offset {:3} */ /* fields for {} */",
@@ -322,8 +293,8 @@ impl<'a> DecompilationResult<'a> {
                 let mut fields: Vec<String> = Vec::new();
                 for field in data.fields.clone() {
                     let is_enumerate = matches!(field, pdb::TypeData::Enumerate(_));
-                    let mut dc = DecompilationResult::from_data(type_finder, field);
-                    let mut s = dc.repersentation().to_string();
+                    let dc = DecompilationResult::from_data(type_finder, field);
+                    let mut s = dc.repersentation.to_string();
 
                     if !is_enumerate {
                         // if we dont have an enum, we need to add a semicolon
@@ -333,8 +304,8 @@ impl<'a> DecompilationResult<'a> {
                 }
                 if let Some(continuation) = data.continuation {
                     // recurse
-                    let mut dc = DecompilationResult::from_index(type_finder, continuation);
-                    fields.push(format!("{};", dc.repersentation()));
+                    let dc = DecompilationResult::from_index(type_finder, continuation);
+                    fields.push(format!("{};", dc.repersentation));
                 }
                 fields.join("\n")
             }
@@ -345,12 +316,12 @@ impl<'a> DecompilationResult<'a> {
                 let (templates, type_name, templates_map) = parse_template_types(&type_name);
 
                 if data.properties.forward_reference() {
-                    self.repersentation = Some(format!("union {type_name}"));
-                    return self.repersentation();
+                    self.repersentation = format!("union {type_name}");
+                    return;
                 }
 
-                let mut dc = DecompilationResult::from_index(type_finder, data.fields);
-                let mut fields = do_indent(dc.repersentation());
+                let dc = DecompilationResult::from_index(type_finder, data.fields);
+                let mut fields = do_indent(&dc.repersentation);
 
                 for (identifier, template) in templates_map {
                     fields = fields.replace(&template, &identifier);
@@ -371,15 +342,15 @@ impl<'a> DecompilationResult<'a> {
                 let type_name = data.name.to_string().into_owned();
 
                 if data.properties.forward_reference() {
-                    self.repersentation = Some(format!("enum {type_name}"));
-                    return self.repersentation();
+                    self.repersentation = format!("enum {type_name}");
+                    return;
                 }
 
-                let mut dc = DecompilationResult::from_index(type_finder, data.fields);
-                let fields = do_indent(dc.repersentation());
-                let mut underlying_dc =
+                let dc = DecompilationResult::from_index(type_finder, data.fields);
+                let fields = do_indent(&dc.repersentation);
+                let underlying_dc =
                     DecompilationResult::from_index(type_finder, data.underlying_type);
-                let underlying_type = underlying_dc.name();
+                let underlying_type = underlying_dc.repersentation;
 
                 format!(
                     "{}enum class {type_name} : {underlying_type} {{\n{fields}\n}}",
@@ -388,37 +359,37 @@ impl<'a> DecompilationResult<'a> {
             }
             Some(pdb::TypeData::Pointer(data)) => {
                 // Pointer to a diffrent datatype
-                let mut dc = DecompilationResult::from_index(type_finder, data.underlying_type);
-                format!("{}*", dc.repersentation())
+                let dc = DecompilationResult::from_index(type_finder, data.underlying_type);
+                format!("{}*", dc.repersentation)
             }
             Some(pdb::TypeData::Modifier(data)) => {
                 // Wrapper around another type that describes a modifier. Can be const, volatile, or unaligned.
-                let mut dc = DecompilationResult::from_index(type_finder, data.underlying_type);
-                format!("{}{}", modifier_string(*data), dc.repersentation())
+                let dc = DecompilationResult::from_index(type_finder, data.underlying_type);
+                format!("{}{}", modifier_string(*data), dc.repersentation)
             }
             Some(pdb::TypeData::Array(data)) => {
                 let mut suffix: String = String::new();
                 for size in &data.dimensions {
                     suffix = format!("{suffix}[{size}]");
                 }
-                let mut dc = DecompilationResult::from_index(type_finder, data.element_type);
-                format!("{}{suffix}", dc.name())
+                let dc = DecompilationResult::from_index(type_finder, data.element_type);
+                format!("{}{suffix}", dc.name)
             }
             Some(pdb::TypeData::Procedure(data)) => {
-                let mut dc = DecompilationResult::from_index(type_finder, data.argument_list);
-                let args = dc.repersentation();
+                let dc = DecompilationResult::from_index(type_finder, data.argument_list);
+                let args = dc.repersentation;
 
                 let return_type = data.return_type.map_or_else(
                     || "void".to_string(),
                     |return_type| {
-                        let mut dc = DecompilationResult::from_index(type_finder, return_type);
-                        dc.name().to_string()
+                        let dc = DecompilationResult::from_index(type_finder, return_type);
+                        dc.name
                     },
                 );
                 format!("{return_type}({args})")
             }
             Some(pdb::TypeData::Nested(data)) => {
-                let mut dc = DecompilationResult::from_index(type_finder, data.nested_type);
+                let dc = DecompilationResult::from_index(type_finder, data.nested_type);
                 format!(
                     "{}{}",
                     FieldAttributes {
@@ -426,7 +397,7 @@ impl<'a> DecompilationResult<'a> {
                         is_virtual: false
                     }
                     .as_string(),
-                    dc.repersentation()
+                    dc.repersentation
                 )
             }
             Some(pdb::TypeData::Method(data)) => match find_type(type_finder, data.method_type) {
@@ -492,37 +463,41 @@ impl<'a> DecompilationResult<'a> {
                 format!("todo! VirtualBaseClass {data:?}")
             }
             Some(pdb::TypeData::VirtualFunctionTablePointer(data)) => {
-                let mut dc = DecompilationResult::from_index(type_finder, data.table);
-                format!("{}*", dc.repersentation())
+                let dc = DecompilationResult::from_index(type_finder, data.table);
+                format!("{}*", dc.repersentation)
             }
             Some(pdb::TypeData::Bitfield(data)) => {
-                let mut dc = DecompilationResult::from_index(type_finder, data.underlying_type);
-                format!("{} : {}", dc.repersentation(), data.length)
+                let dc = DecompilationResult::from_index(type_finder, data.underlying_type);
+                format!("{} : {}", dc.repersentation, data.length)
             }
             Some(pdb::TypeData::ArgumentList(data)) => {
                 let mut args = Vec::new();
                 for arg_type in data.arguments.clone() {
-                    let mut dc = DecompilationResult::from_index(type_finder, arg_type);
-                    args.push(dc.name().to_string());
+                    let dc = DecompilationResult::from_index(type_finder, arg_type);
+                    args.push(dc.name.to_string());
                 }
                 args.join(",")
             }
             Some(pdb::TypeData::MethodList(data)) => format!("todo! MethodList {data:?}"),
             _ => todo!(),
-        });
-
-        self.repersentation()
+        };
     }
 
-    fn class_to_string(&mut self) -> String {
-        let name = self.name().to_string();
-        let data = &mut self.data;
+    fn raw_name(&self) -> &str {
+        let name: &str = &self.name;
+        let index = name.find('<');
+        index.map_or_else(|| name, |index| &name[..index])
+    }
+
+    fn class_to_string(&self) -> String {
+        let name = &self.name;
+        let data = self.data.as_ref();
 
         let Some(pdb::TypeData::Class(data)) = data else {
             return format!("/* error processing class {name} */");
         };
 
-        let (templates, name, templates_map) = parse_template_types(&name);
+        let (templates, name, templates_map) = parse_template_types(name);
         let kind = match data.kind {
             pdb::ClassKind::Class => "class",
             pdb::ClassKind::Struct => "struct",
@@ -540,18 +515,16 @@ impl<'a> DecompilationResult<'a> {
         }
 
         if let Some(type_index) = data.fields {
-            let mut dc = DecompilationResult::from_index(self.type_finder, type_index);
-            fields.push(dc.repersentation().to_string());
-            self.base_classes.extend(dc.base_classes);
-            self.dependancies.extend(dc.dependancies);
+            let dc = DecompilationResult::from_index(self.type_finder, type_index);
+            fields.push(dc.repersentation);
+            self.base_classes.borrow_mut().extend(dc.base_classes.borrow_mut().drain());
+            self.dependencies.borrow_mut().extend(dc.dependencies.borrow_mut().drain());
         }
 
         let mut base_classes = String::new();
-        if !self.base_classes.is_empty() {
-            for (i, base) in self.base_classes.iter().enumerate() {
-                let prefix = if i == 0 { ':' } else { ',' };
-                base_classes.push_str(&format!("{prefix} {base}"));
-            }
+        for (i, base) in self.base_classes.borrow().iter().enumerate() {
+            let prefix = if i == 0 { ':' } else { ',' };
+            base_classes.push_str(&format!("{prefix} {base}"));
         }
 
         let mut fields = do_indent(&fields.join("\n"));
@@ -564,6 +537,33 @@ impl<'a> DecompilationResult<'a> {
             "{}{templates}{kind} {name}{base_classes} {{\n{fields}\n}}",
             stringify_properties(data.properties)
         )
+    }
+
+    fn namespaced_repersentation(&self) -> String {
+        let name = self.raw_name();
+
+        let mut namespaces = list_namespaces_as_vec(name);
+        let short_name = namespaces.pop().unwrap_or_default();
+        let repersentation = &self.repersentation;
+        if namespaces.is_empty() {
+            return format!("{repersentation};");
+        }
+
+        let data_structure = repersentation.replacen(name, &short_name, 1);
+
+        let mut namespaced_string = String::new();
+        for namespace in &namespaces {
+            namespaced_string.push_str("namespace ");
+            namespaced_string.push_str(namespace);
+            namespaced_string.push_str(" { ");
+        }
+        namespaced_string.push_str(&data_structure);
+        namespaced_string.push(';');
+        for _ in &namespaces {
+            namespaced_string.push_str(" }");
+        }
+        namespaced_string.push(';');
+        namespaced_string
     }
 }
 
@@ -580,8 +580,8 @@ fn method_to_string(
     let return_type = if is_destructor || function_attributes.is_constructor() {
         ""
     } else {
-        let mut dc = DecompilationResult::from_index(type_finder, return_type);
-        &format!("{} ", dc.name())
+        let dc = DecompilationResult::from_index(type_finder, return_type);
+        &format!("{} ", dc.name)
     };
 
     let calling_convention = CallingConvention(function_attributes.calling_convention()).as_cpp();
@@ -593,8 +593,8 @@ fn method_to_string(
         .as_string()
     });
 
-    let mut dc = DecompilationResult::from_index(type_finder, arguments_list);
-    let arguments = dc.repersentation();
+    let dc = DecompilationResult::from_index(type_finder, arguments_list);
+    let arguments = dc.repersentation;
 
     format!("{field_attributes}{return_type}{calling_convention}{method_name}({arguments})",)
 }
@@ -856,9 +856,8 @@ pub fn decompile_forward_refrences(
             _ => return Ok(()),
         };
 
-        let mut dc = DecompilationResult::from_data(type_finder, data);
-        let forward_refrence = dc.repersentation();
-        let forward_refrence = parse_namespaces(forward_refrence, &name);
+        let dc = DecompilationResult::from_data(type_finder, data);
+        let forward_refrence = dc.namespaced_repersentation();
         let forward_refrence = parse_lambdas(&forward_refrence, lambda_names);
 
         forward_refrences.insert(forward_refrence);
@@ -895,7 +894,7 @@ fn is_std_namespace(data: &pdb::TypeData<'_>) -> bool {
     })
 }
 
-fn sort_with_dependancies(
+fn sort_with_dependencies(
     mut classes_and_unions: HashMap<String, HashSet<String>>,
 ) -> Result<Vec<String>> {
     let mut topo_sort = TopoSort::with_capacity(classes_and_unions.len());
@@ -965,9 +964,8 @@ fn decompile_classes_unions_and_enums(
             _ => return Ok(()),
         };
 
-        let mut dc = DecompilationResult::from_data(type_finder, data);
-        let s = dc.repersentation();
-        let s = parse_namespaces(s, &name);
+        let dc = DecompilationResult::from_data(type_finder, data);
+        let s = dc.namespaced_repersentation();
         let s = parse_lambdas(&s, lambda_names);
 
         if is_enum {
