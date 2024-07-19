@@ -205,7 +205,6 @@ impl<'a> DecompilationResult<'a> {
         };
 
         dc.calculate_name();
-        dc.calculate_repersentation();
 
         dc
     }
@@ -238,13 +237,20 @@ impl<'a> DecompilationResult<'a> {
                 format!("{}{}", modifier_string(*data), dc.name)
             }
 
-            Some(data) => match data.name() {
-                Some(name) => name.to_string().into_owned(),
-                None => self.repersentation.clone(),
-            },
+            Some(data) if data.name().is_some() => data
+                .name()
+                .expect("We already checked is_some")
+                .to_string()
+                .into_owned(),
 
-            _ => self.repersentation.clone(),
+            _ => {
+                self.calculate_repersentation();
+                self.name = self.repersentation.clone();
+                return;
+            }
         };
+
+        self.calculate_repersentation();
     }
 
     #[allow(clippy::too_many_lines)]
@@ -517,8 +523,12 @@ impl<'a> DecompilationResult<'a> {
         if let Some(type_index) = data.fields {
             let dc = DecompilationResult::from_index(self.type_finder, type_index);
             fields.push(dc.repersentation);
-            self.base_classes.borrow_mut().extend(dc.base_classes.borrow_mut().drain());
-            self.dependencies.borrow_mut().extend(dc.dependencies.borrow_mut().drain());
+            self.base_classes
+                .borrow_mut()
+                .extend(dc.base_classes.borrow_mut().drain());
+            self.dependencies
+                .borrow_mut()
+                .extend(dc.dependencies.borrow_mut().drain());
         }
 
         let mut base_classes = String::new();
@@ -838,23 +848,17 @@ pub fn decompile_forward_refrences(
             return Ok(());
         }
 
-        let name = match &data {
+        match &data {
             pdb::TypeData::Class(data)
                 if data.properties.forward_reference()
                     && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() =>
-            {
-                data.name.to_string()
-            }
+                    && !data.properties.scoped_definition() => {}
             pdb::TypeData::Union(data)
                 if data.properties.forward_reference()
                     && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() =>
-            {
-                data.name.to_string()
-            }
+                    && !data.properties.scoped_definition() => {}
             _ => return Ok(()),
-        };
+        }
 
         let dc = DecompilationResult::from_data(type_finder, data);
         let forward_refrence = dc.namespaced_repersentation();
