@@ -1,15 +1,16 @@
 #![allow(clippy::expect_used)]
 #![allow(clippy::trivial_regex)]
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use core::panic;
 use lazy_regex::regex;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
+use topo_sort::{SortResults, TopoSort};
 
-use pdb::{FallibleIterator, RawString};
+use pdb::FallibleIterator;
 
 fn primitive_name(data: pdb::PrimitiveType) -> String {
     #[allow(clippy::match_same_arms)]
@@ -98,9 +99,6 @@ fn stringify_properties(properties: pdb::TypeProperties) -> String {
 
     if properties.packed() {
         s.push_str("packed ");
-    }
-    if properties.constructors() {
-        s.push_str("constructors ");
     }
     if properties.overloaded_operators() {
         s.push_str("overloaded_operators ");
@@ -208,241 +206,400 @@ fn parse_namespaces(data_structure: &str, name: &str) -> String {
     namespaced_string
 }
 
-#[allow(clippy::too_many_lines)]
-fn convert_pdb_data_to_cpp_code(
-    type_finder: &pdb::TypeFinder<'_>,
-    type_data: pdb::TypeData<'_>,
-    base_classes: &mut Vec<String>,
-) -> Result<String, pdb::Error> {
-    Ok(match type_data {
-        pdb::TypeData::Member(data) => {
-            // A field inside a class
-            Field {
-                type_name: type_index_to_string(type_finder, data.field_type),
-                name: data.name.to_string().into(),
-                offset: Some(data.offset),
-            }
-            .as_string()
-        }
-        pdb::TypeData::StaticMember(data) => {
-            let type_data = type_finder.find(data.field_type)?.parse()?;
-            let s = convert_pdb_data_to_cpp_code(type_finder, type_data, base_classes)?;
-            format!("static {s}")
-        }
-
-        pdb::TypeData::BaseClass(data) => {
-            let attributes = FieldAttributes {
-                attributes: data.attributes,
-                is_virtual: false,
-            }
-            .as_string();
-            let type_name = type_index_to_string(type_finder, data.base_class);
-
-            base_classes.push(format!("{attributes}{type_name}"));
-
-            format!(
-                "/* offset {:3} */ /* fields for {} */",
-                data.offset, type_name
-            )
-        }
-
-        pdb::TypeData::Primitive(data) => primitive_name(data), // A primitive type in c++. See primitive_name() for a full list.
-        pdb::TypeData::Class(data) => {
-            // A class type in c++
-            // TODO handle data.properties
-            Class::new(data).as_string(type_finder)
-        }
-        pdb::TypeData::FieldList(data) => {
-            // A list of fields inside a class
-            let mut fields: Vec<String> = Vec::new();
-            for field in data.fields {
-                let err = format!("todo! field type not found: {field:?}");
-                let is_enumerate = matches!(field, pdb::TypeData::Enumerate(_));
-                let mut s = convert_pdb_data_to_cpp_code(type_finder, field.clone(), base_classes)
-                    .unwrap_or(err);
-
-                if !is_enumerate {
-                    // if we dont have an enum, we need to add a semicolon
-                    s.push(';');
-                }
-                fields.push(s);
-            }
-            if let Some(continuation) = data.continuation {
-                // recurse
-                fields.push(format!(
-                    "{};",
-                    convert_pdb_data_to_cpp_code_from_index(
-                        type_finder,
-                        continuation,
-                        base_classes,
-                    )?
-                ));
-            }
-            fields.join("\n")
-        }
-        pdb::TypeData::Union(data) => {
-            // A union type in c++
-            // TODO handle data.properties
-            let type_name = data.name.to_string().into_owned();
-            let (templates, type_name, templates_map) = parse_template_types(&type_name);
-
-            if data.properties.forward_reference() {
-                return Ok(format!("union {type_name}"));
-            }
-
-            let fields =
-                convert_pdb_data_to_cpp_code_from_index(type_finder, data.fields, base_classes)?;
-            let mut fields = do_indent(&fields);
-
-            for (identifier, template) in templates_map {
-                fields = fields.replace(&template, &identifier);
-            }
-
-            format!(
-                "{}{templates}union {type_name} {{\n{fields}\n}}",
-                stringify_properties(data.properties),
-            )
-        }
-        pdb::TypeData::Enumerate(data) => {
-            // One of the values inside an enum
-            format!("{} = {},", data.name, data.value)
-        }
-        pdb::TypeData::Enumeration(data) => {
-            // An enum type in c++
-            // TODO handle data.properties
-            let type_name = data.name.to_string().into_owned();
-
-            if data.properties.forward_reference() {
-                return Ok(format!("enum {type_name}"));
-            }
-
-            let fields =
-                convert_pdb_data_to_cpp_code_from_index(type_finder, data.fields, base_classes)?;
-            let fields = do_indent(&fields);
-            let underlying_type = type_index_to_string(type_finder, data.underlying_type);
-
-            format!(
-                "{}enum class {type_name} : {underlying_type} {{\n{fields}\n}}",
-                stringify_properties(data.properties),
-            )
-        }
-        pdb::TypeData::Pointer(data) => {
-            // Pointer to a diffrent datatype
-            let mut s = convert_pdb_data_to_cpp_code_from_index(
-                type_finder,
-                data.underlying_type,
-                base_classes,
-            )?;
-            s.push('*');
-            s
-        }
-        pdb::TypeData::Modifier(data) => {
-            // Wrapper around another type that describes a modifier. Can be const, volatile, or unaligned.
-            let s = convert_pdb_data_to_cpp_code_from_index(
-                type_finder,
-                data.underlying_type,
-                base_classes,
-            )?;
-            format!("{}{s}", modifier_string(data))
-        }
-        pdb::TypeData::Array(data) => {
-            let mut suffix: String = String::new();
-            for size in data.dimensions {
-                suffix = format!("{suffix}[{size}]");
-            }
-            let name = convert_pdb_data_to_cpp_code_from_index(
-                type_finder,
-                data.element_type,
-                base_classes,
-            )?;
-            format!("{name}{suffix}")
-        }
-        pdb::TypeData::Procedure(data) => {
-            let args = argument_list(type_finder, data.argument_list)?.join(", ");
-            let return_type = data.return_type.map_or_else(
-                || "void".to_string(),
-                |return_type| type_index_to_string(type_finder, return_type),
-            );
-            format!("{return_type}({args})")
-        }
-        pdb::TypeData::Nested(data) => {
-            let s = convert_pdb_data_to_cpp_code_from_index(
-                type_finder,
-                data.nested_type,
-                base_classes,
-            )?;
-            format!(
-                "{}{s}",
-                FieldAttributes {
-                    attributes: data.attributes,
-                    is_virtual: false
-                }
-                .as_string()
-            )
-        }
-        pdb::TypeData::Method(data) => {
-            Method::new(type_finder, data.name, data.attributes, data.method_type)?.as_string()
-        }
-
-        pdb::TypeData::OverloadedMethod(data) => {
-            // this just means we have more than one method with the same name
-            // find the method list
-            match type_finder.find(data.method_list)?.parse()? {
-                pdb::TypeData::MethodList(method_list) => {
-                    let mut s = Vec::new();
-                    for pdb::MethodListEntry {
-                        attributes,
-                        method_type,
-                        ..
-                    } in method_list.methods
-                    {
-                        // hooray
-                        let method = Method::new(type_finder, data.name, attributes, method_type)?;
-
-                        s.push(method.as_string());
-                    }
-                    s.join(";\n")
-                }
-                other => {
-                    format!("processing OverloadedMethod, expected MethodList, got {} -> {:?}. unexpected type in Class::add_field()", data.method_list, other)
-                }
-            }
-        }
-        pdb::TypeData::MemberFunction(data) => Method {
-            name: RawString::from(""), // todo!
-            return_type_name: type_index_to_string(type_finder, data.return_type),
-            arguments: argument_list(type_finder, data.argument_list)?,
-            attributes: data.attributes,
-            is_virtual: false,
-            is_static: false,
-        }
-        .as_string(),
-        pdb::TypeData::VirtualBaseClass(data) => format!("todo! VirtualBaseClass {data:?}"),
-        pdb::TypeData::VirtualFunctionTablePointer(data) => {
-            let s = convert_pdb_data_to_cpp_code_from_index(type_finder, data.table, base_classes)?;
-            format!("{s}*")
-        }
-        pdb::TypeData::Bitfield(data) => {
-            let s = convert_pdb_data_to_cpp_code_from_index(
-                type_finder,
-                data.underlying_type,
-                base_classes,
-            )?;
-            format!("{} : {}", s, data.length)
-        }
-        pdb::TypeData::ArgumentList(data) => format!("todo! ArgumentList {data:?}"),
-        pdb::TypeData::MethodList(data) => format!("todo! MethodList {data:?}"),
-        _ => todo!(),
-    })
+fn find_type<'a>(
+    type_finder: &pdb::TypeFinder<'a>,
+    type_index: pdb::TypeIndex,
+) -> Result<pdb::TypeData<'a>> {
+    Ok(type_finder.find(type_index)?.parse()?)
 }
 
-fn convert_pdb_data_to_cpp_code_from_index(
+struct DecompilationResult<'a> {
+    repersentation: Option<String>,
+    name: Option<String>,
+    dependancies: HashSet<String>,
+    data: Option<pdb::TypeData<'a>>,
+    type_finder: &'a pdb::TypeFinder<'a>,
+    base_classes: Vec<String>,
+}
+
+impl<'a> DecompilationResult<'a> {
+    fn from_data(type_finder: &'a pdb::TypeFinder<'a>, data: pdb::TypeData<'a>) -> Self {
+        DecompilationResult {
+            repersentation: None,
+            name: None,
+            dependancies: HashSet::new(),
+            data: Some(data),
+            type_finder,
+            base_classes: Vec::new(),
+        }
+    }
+
+    fn from_index(type_finder: &'a pdb::TypeFinder<'a>, type_index: pdb::TypeIndex) -> Self {
+        match find_type(type_finder, type_index) {
+            Ok(data) => DecompilationResult::from_data(type_finder, data),
+            Err(e) => DecompilationResult {
+                repersentation: Some(format!("/* error processing type index {type_index} {e}*/")),
+                name: Some(format!("/* error processing type index {type_index} {e}*/")),
+                dependancies: HashSet::new(),
+                data: None,
+                type_finder,
+                base_classes: Vec::new(),
+            },
+        }
+    }
+
+    fn name(&mut self) -> &str {
+        if let Some(ref name) = self.name {
+            return name;
+        }
+
+        let type_finder = self.type_finder;
+
+        self.name = Some(match &self.data {
+            Some(pdb::TypeData::Pointer(data)) => {
+                let mut dc = DecompilationResult::from_index(type_finder, data.underlying_type);
+                format!("{}*", dc.name())
+            }
+
+            Some(pdb::TypeData::Modifier(data)) => {
+                let mut dc = DecompilationResult::from_index(type_finder, data.underlying_type);
+                format!("{}{}", modifier_string(*data), dc.name())
+            }
+
+            Some(data) => match data.name() {
+                Some(name) => name.to_string().into_owned(),
+                None => return self.repersentation(),
+            },
+
+            _ => return self.repersentation(),
+        });
+
+        self.name()
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn repersentation(&mut self) -> &str {
+        if let Some(ref repersentation) = self.repersentation {
+            return repersentation;
+        }
+
+        let type_finder = self.type_finder;
+
+        self.repersentation = Some(match &mut self.data {
+            Some(pdb::TypeData::Member(data)) => {
+                // A field inside a class
+                let mut dc = DecompilationResult::from_index(type_finder, data.field_type);
+                let offset = data.offset;
+                let field_type = dc.name();
+                let field_name = data.name.to_string();
+                format!("/* offset {offset:3} */ {field_type} {field_name}")
+            }
+            Some(pdb::TypeData::StaticMember(data)) => {
+                let mut dc = DecompilationResult::from_index(type_finder, data.field_type);
+                format!("static {}", dc.repersentation())
+            }
+            Some(pdb::TypeData::BaseClass(data)) => {
+                let attributes = FieldAttributes {
+                    attributes: data.attributes,
+                    is_virtual: false,
+                }
+                .as_string();
+                let mut dc = DecompilationResult::from_index(type_finder, data.base_class);
+                let type_name = dc.name();
+
+                self.base_classes.push(format!("{attributes}{type_name}"));
+
+                format!(
+                    "/* offset {:3} */ /* fields for {} */",
+                    data.offset, type_name
+                )
+            }
+            Some(pdb::TypeData::Primitive(data)) => primitive_name(*data), // A primitive type in c++. See primitive_name() for a full list.
+            Some(pdb::TypeData::Class(_)) => {
+                // A class type in c++
+                // TODO handle data.properties
+                self.class_to_string()
+            }
+            Some(pdb::TypeData::FieldList(data)) => {
+                // A list of fields inside a class
+                let mut fields: Vec<String> = Vec::new();
+                for field in data.fields.clone() {
+                    let is_enumerate = matches!(field, pdb::TypeData::Enumerate(_));
+                    let mut dc = DecompilationResult::from_data(type_finder, field);
+                    let mut s = dc.repersentation().to_string();
+
+                    if !is_enumerate {
+                        // if we dont have an enum, we need to add a semicolon
+                        s.push(';');
+                    }
+                    fields.push(s);
+                }
+                if let Some(continuation) = data.continuation {
+                    // recurse
+                    let mut dc = DecompilationResult::from_index(type_finder, continuation);
+                    fields.push(format!("{};", dc.repersentation()));
+                }
+                fields.join("\n")
+            }
+            Some(pdb::TypeData::Union(data)) => {
+                // A union type in c++
+                // TODO handle data.properties
+                let type_name = data.name.to_string().into_owned();
+                let (templates, type_name, templates_map) = parse_template_types(&type_name);
+
+                if data.properties.forward_reference() {
+                    self.repersentation = Some(format!("union {type_name}"));
+                    return self.repersentation();
+                }
+
+                let mut dc = DecompilationResult::from_index(type_finder, data.fields);
+                let mut fields = do_indent(dc.repersentation());
+
+                for (identifier, template) in templates_map {
+                    fields = fields.replace(&template, &identifier);
+                }
+
+                format!(
+                    "{}{templates}union {type_name} {{\n{fields}\n}}",
+                    stringify_properties(data.properties),
+                )
+            }
+            Some(pdb::TypeData::Enumerate(data)) => {
+                // One of the values inside an enum
+                format!("{} = {},", data.name, data.value)
+            }
+            Some(pdb::TypeData::Enumeration(data)) => {
+                // An enum type in c++
+                // TODO handle data.properties
+                let type_name = data.name.to_string().into_owned();
+
+                if data.properties.forward_reference() {
+                    self.repersentation = Some(format!("enum {type_name}"));
+                    return self.repersentation();
+                }
+
+                let mut dc = DecompilationResult::from_index(type_finder, data.fields);
+                let fields = do_indent(dc.repersentation());
+                let mut underlying_dc =
+                    DecompilationResult::from_index(type_finder, data.underlying_type);
+                let underlying_type = underlying_dc.name();
+
+                format!(
+                    "{}enum class {type_name} : {underlying_type} {{\n{fields}\n}}",
+                    stringify_properties(data.properties),
+                )
+            }
+            Some(pdb::TypeData::Pointer(data)) => {
+                // Pointer to a diffrent datatype
+                let mut dc = DecompilationResult::from_index(type_finder, data.underlying_type);
+                format!("{}*", dc.repersentation())
+            }
+            Some(pdb::TypeData::Modifier(data)) => {
+                // Wrapper around another type that describes a modifier. Can be const, volatile, or unaligned.
+                let mut dc = DecompilationResult::from_index(type_finder, data.underlying_type);
+                format!("{}{}", modifier_string(*data), dc.repersentation())
+            }
+            Some(pdb::TypeData::Array(data)) => {
+                let mut suffix: String = String::new();
+                for size in &data.dimensions {
+                    suffix = format!("{suffix}[{size}]");
+                }
+                let mut dc = DecompilationResult::from_index(type_finder, data.element_type);
+                format!("{}{suffix}", dc.name())
+            }
+            Some(pdb::TypeData::Procedure(data)) => {
+                let mut dc = DecompilationResult::from_index(type_finder, data.argument_list);
+                let args = dc.repersentation();
+
+                let return_type = data.return_type.map_or_else(
+                    || "void".to_string(),
+                    |return_type| {
+                        let mut dc = DecompilationResult::from_index(type_finder, return_type);
+                        dc.name().to_string()
+                    },
+                );
+                format!("{return_type}({args})")
+            }
+            Some(pdb::TypeData::Nested(data)) => {
+                let mut dc = DecompilationResult::from_index(type_finder, data.nested_type);
+                format!(
+                    "{}{}",
+                    FieldAttributes {
+                        attributes: data.attributes,
+                        is_virtual: false
+                    }
+                    .as_string(),
+                    dc.repersentation()
+                )
+            }
+            Some(pdb::TypeData::Method(data)) => match find_type(type_finder, data.method_type) {
+                Ok(pdb::TypeData::MemberFunction(member_function_data)) => method_to_string(
+                    type_finder,
+                    &data.name.to_string(),
+                    member_function_data.return_type,
+                    member_function_data.argument_list,
+                    member_function_data.attributes,
+                    Some(data.attributes),
+                ),
+                other => {
+                    format!("processing Method, expected MethodType, got {other:?}.")
+                }
+            },
+            Some(pdb::TypeData::OverloadedMethod(data)) => {
+                // this just means we have more than one method with the same name
+                // find the method list
+                match find_type(type_finder, data.method_list) {
+                    Ok(pdb::TypeData::MethodList(method_list)) => {
+                        let mut s = Vec::new();
+                        for pdb::MethodListEntry {
+                            attributes,
+                            method_type,
+                            ..
+                        } in method_list.methods
+                        {
+                            // hooray
+                            match find_type(type_finder, method_type) {
+                                Ok(pdb::TypeData::MemberFunction(member_function_data)) => {
+                                    s.push(method_to_string(
+                                        type_finder,
+                                        &data.name.to_string(),
+                                        member_function_data.return_type,
+                                        member_function_data.argument_list,
+                                        member_function_data.attributes,
+                                        Some(attributes),
+                                    ));
+                                }
+                                other => {
+                                    s.push(format!(
+                                        "processing OverloadedMethod, expected MethodList, got {other:?}."
+                                    ));
+                                }
+                            }
+                        }
+                        s.join(";\n")
+                    }
+                    other => {
+                        format!("processing OverloadedMethod, expected MethodList, got {other:?}.")
+                    }
+                }
+            }
+            Some(pdb::TypeData::MemberFunction(data)) => method_to_string(
+                type_finder,
+                "",
+                data.return_type,
+                data.argument_list,
+                data.attributes,
+                None,
+            ),
+            Some(pdb::TypeData::VirtualBaseClass(data)) => {
+                format!("todo! VirtualBaseClass {data:?}")
+            }
+            Some(pdb::TypeData::VirtualFunctionTablePointer(data)) => {
+                let mut dc = DecompilationResult::from_index(type_finder, data.table);
+                format!("{}*", dc.repersentation())
+            }
+            Some(pdb::TypeData::Bitfield(data)) => {
+                let mut dc = DecompilationResult::from_index(type_finder, data.underlying_type);
+                format!("{} : {}", dc.repersentation(), data.length)
+            }
+            Some(pdb::TypeData::ArgumentList(data)) => {
+                let mut args = Vec::new();
+                for arg_type in data.arguments.clone() {
+                    let mut dc = DecompilationResult::from_index(type_finder, arg_type);
+                    args.push(dc.name().to_string());
+                }
+                args.join(",")
+            }
+            Some(pdb::TypeData::MethodList(data)) => format!("todo! MethodList {data:?}"),
+            _ => todo!(),
+        });
+
+        self.repersentation()
+    }
+
+    fn class_to_string(&mut self) -> String {
+        let name = self.name().to_string();
+        let data = &mut self.data;
+
+        let Some(pdb::TypeData::Class(data)) = data else {
+            return format!("/* error processing class {name} */");
+        };
+
+        let (templates, name, templates_map) = parse_template_types(&name);
+        let kind = match data.kind {
+            pdb::ClassKind::Class => "class",
+            pdb::ClassKind::Struct => "struct",
+            pdb::ClassKind::Interface => "interface", // when can this happen?
+        };
+
+        if data.properties.forward_reference() {
+            return format!("{templates}{kind} {name}");
+        }
+
+        let mut fields: Vec<String> = Vec::new();
+
+        if data.derived_from.is_some() {
+            todo!();
+        }
+
+        if let Some(type_index) = data.fields {
+            let mut dc = DecompilationResult::from_index(self.type_finder, type_index);
+            fields.push(dc.repersentation().to_string());
+            self.base_classes.extend(dc.base_classes);
+            self.dependancies.extend(dc.dependancies);
+        }
+
+        let mut base_classes = String::new();
+        if !self.base_classes.is_empty() {
+            for (i, base) in self.base_classes.iter().enumerate() {
+                let prefix = if i == 0 { ':' } else { ',' };
+                base_classes.push_str(&format!("{prefix} {base}"));
+            }
+        }
+
+        let mut fields = do_indent(&fields.join("\n"));
+        for (identifier, template) in templates_map {
+            fields = fields.replace(&template, &identifier);
+            base_classes = base_classes.replace(&template, &identifier);
+        }
+
+        format!(
+            "{}{templates}{kind} {name}{base_classes} {{\n{fields}\n}}",
+            stringify_properties(data.properties)
+        )
+    }
+}
+
+fn method_to_string(
     type_finder: &pdb::TypeFinder<'_>,
-    type_index: pdb::TypeIndex,
-    base_classes: &mut Vec<String>,
-) -> Result<String, pdb::Error> {
-    let data = type_finder.find(type_index)?.parse()?;
-    convert_pdb_data_to_cpp_code(type_finder, data, base_classes)
+    method_name: &str,
+    return_type: pdb::TypeIndex,
+    arguments_list: pdb::TypeIndex,
+    function_attributes: pdb::FunctionAttributes,
+    field_attributes: Option<pdb::FieldAttributes>,
+) -> String {
+    let is_destructor = method_name.starts_with('~');
+
+    let return_type = if is_destructor || function_attributes.is_constructor() {
+        ""
+    } else {
+        let mut dc = DecompilationResult::from_index(type_finder, return_type);
+        &format!("{} ", dc.name())
+    };
+
+    let calling_convention = CallingConvention(function_attributes.calling_convention()).as_cpp();
+    let field_attributes = field_attributes.map_or_else(String::new, |field_attributes| {
+        FieldAttributes {
+            attributes: field_attributes,
+            is_virtual: false,
+        }
+        .as_string()
+    });
+
+    let mut dc = DecompilationResult::from_index(type_finder, arguments_list);
+    let arguments = dc.repersentation();
+
+    format!("{field_attributes}{return_type}{calling_convention}{method_name}({arguments})",)
 }
 
 /// We need to split template types by commas, however sometimes nested templates contain commas inside <>.
@@ -549,138 +706,6 @@ fn parse_template_types(class_name: &str) -> (String, String, HashMap<String, St
     )
 }
 
-struct Class<'p> {
-    data: pdb::ClassType<'p>,
-    base_classes: Vec<String>,
-}
-
-impl<'p> Class<'p> {
-    const fn new(data: pdb::ClassType<'p>) -> Self {
-        Class {
-            data,
-            base_classes: Vec::new(),
-        }
-    }
-
-    fn as_string(&mut self, type_finder: &'p pdb::TypeFinder) -> String {
-        let name = self.data.name.to_string().into_owned();
-        let (templates, name, templates_map) = parse_template_types(&name);
-        let kind = match self.data.kind {
-            pdb::ClassKind::Class => "class",
-            pdb::ClassKind::Struct => "struct",
-            pdb::ClassKind::Interface => "interface", // when can this happen?
-        };
-
-        if self.data.properties.forward_reference() {
-            return format!("{templates}{kind} {name}");
-        }
-
-        let mut fields: Vec<String> = Vec::new();
-
-        if let Some(derived_from) = self.data.derived_from {
-            if let Err(e) = self.add_derived_from(type_finder, derived_from) {
-                fields.push(format!("/* derived from error: {e} */"));
-            }
-        }
-
-        if let Some(type_index) = self.data.fields {
-            match convert_pdb_data_to_cpp_code_from_index(
-                type_finder,
-                type_index,
-                &mut self.base_classes,
-            ) {
-                Ok(f) => fields.push(f),
-                Err(e) => {
-                    fields.push(format!("/* add field error: {e} */"));
-                }
-            }
-        }
-
-        let mut base_classes = String::new();
-        if !self.base_classes.is_empty() {
-            for (i, base) in self.base_classes.iter().enumerate() {
-                let prefix = if i == 0 { ':' } else { ',' };
-                base_classes.push_str(&format!("{prefix} {base}"));
-            }
-        }
-
-        let mut fields = do_indent(&fields.join("\n"));
-        for (identifier, template) in templates_map {
-            fields = fields.replace(&template, &identifier);
-            base_classes = base_classes.replace(&template, &identifier);
-        }
-
-        format!(
-            "{}{templates}{kind} {name}{base_classes} {{\n{fields}\n}}",
-            stringify_properties(self.data.properties)
-        )
-    }
-
-    #[allow(clippy::unnecessary_wraps)]
-    fn add_derived_from(
-        &self,
-        _: &pdb::TypeFinder<'p>,
-        _: pdb::TypeIndex,
-    ) -> Result<(), pdb::Error> {
-        todo!()
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct Field {
-    type_name: String,
-    name: String,
-    offset: Option<u64>,
-}
-
-impl Field {
-    fn as_string(&self) -> String {
-        self.offset.map_or_else(
-            || format!("{} {}", self.type_name, self.name),
-            |offset| format!("/* offset {offset:3} */ {} {}", self.type_name, self.name),
-        )
-    }
-}
-
-fn type_index_to_string(type_finder: &pdb::TypeFinder<'_>, type_index: pdb::TypeIndex) -> String {
-    match type_finder.find(type_index) {
-        Ok(t) => match t.parse() {
-            Ok(pdb::TypeData::Pointer(data)) => format!(
-                "{}*",
-                type_index_to_string(type_finder, data.underlying_type)
-            ),
-
-            Ok(pdb::TypeData::Primitive(data)) => primitive_name(data),
-
-            Ok(data) if matches!(data, pdb::TypeData::Procedure(_)) => {
-                convert_pdb_data_to_cpp_code(type_finder, data, &mut Vec::new()).unwrap_or_else(
-                    |e| format!("/* error processing type index {type_index} {e}*/"),
-                )
-            }
-
-            Ok(pdb::TypeData::Modifier(data)) => {
-                format!(
-                    "{}{}",
-                    modifier_string(data),
-                    type_index_to_string(type_finder, data.underlying_type)
-                )
-            }
-
-            Ok(data) => data.name().map_or_else(
-                || {
-                    convert_pdb_data_to_cpp_code(type_finder, data, &mut Vec::new()).unwrap_or_else(
-                        |e| format!("/* error processing type index {type_index} {e}*/"),
-                    )
-                },
-                |type_name| type_name.to_string().into_owned(),
-            ),
-
-            Err(e) => format!("/* error parsing type index {type_index} {e}*/"),
-        },
-        Err(e) => format!("/* error finding type index {type_index} {e}*/"),
-    }
-}
-
 #[allow(non_camel_case_types)]
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -773,83 +798,6 @@ impl CallingConvention {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct Method<'p> {
-    name: pdb::RawString<'p>,
-    return_type_name: String,
-    arguments: Vec<String>,
-    attributes: pdb::FunctionAttributes,
-    is_virtual: bool,
-    is_static: bool,
-}
-
-impl<'p> Method<'p> {
-    fn new(
-        type_finder: &pdb::TypeFinder<'p>,
-        name: pdb::RawString<'p>,
-        attributes: pdb::FieldAttributes,
-        type_index: pdb::TypeIndex,
-    ) -> Result<Self, pdb::Error> {
-        match type_finder.find(type_index)?.parse()? {
-            pdb::TypeData::MemberFunction(data) => {
-                let method = Method {
-                    name,
-                    return_type_name: type_index_to_string(type_finder, data.return_type),
-                    arguments: argument_list(type_finder, data.argument_list)?,
-                    attributes: data.attributes,
-                    is_virtual: attributes.is_virtual(),
-                    is_static: attributes.is_static(),
-                };
-                Ok(method)
-            }
-
-            other => {
-                panic!(
-                    "processing Method, expected MemberFunction, got {} -> {:?}. unexpected type in Method::find()",
-                    type_index, other
-                )
-            }
-        }
-    }
-
-    fn as_string(&self) -> String {
-        let name = self.name.to_string();
-        let is_destructor = name.starts_with('~');
-
-        let return_type = if is_destructor || self.attributes.is_constructor() {
-            ""
-        } else {
-            &format!("{} ", self.return_type_name)
-        };
-
-        let arguments = self.arguments.join(", ");
-
-        let calling_convention = CallingConvention(self.attributes.calling_convention()).as_cpp();
-
-        format!(
-            "{}{}{return_type}{calling_convention}{name}({arguments})",
-            if self.is_static { "static " } else { "" },
-            if self.is_virtual { "virtual " } else { "" },
-        )
-    }
-}
-
-fn argument_list(
-    type_finder: &pdb::TypeFinder<'_>,
-    type_index: pdb::TypeIndex,
-) -> Result<Vec<String>, pdb::Error> {
-    match type_finder.find(type_index)?.parse()? {
-        pdb::TypeData::ArgumentList(data) => {
-            let mut args: Vec<String> = Vec::new();
-            for arg_type in data.arguments {
-                args.push(type_index_to_string(type_finder, arg_type));
-            }
-            Ok(args)
-        }
-        _ => todo!("argument list of non-argument-list type"),
-    }
-}
-
 fn typedefs() -> HashMap<&'static str, &'static str> {
     let mut typedefs: HashMap<&str, &str> = HashMap::new();
     typedefs.insert(
@@ -911,10 +859,9 @@ pub fn decompile_forward_refrences(
             _ => return Ok(()),
         };
 
-        let forward_refrence = convert_pdb_data_to_cpp_code(type_finder, data, &mut Vec::new());
-        let forward_refrence = forward_refrence
-            .unwrap_or_else(|e| format!("/* error processing type index {type_index} {e}*/"));
-        let forward_refrence = parse_namespaces(&forward_refrence, &name);
+        let mut dc = DecompilationResult::from_data(type_finder, data);
+        let forward_refrence = dc.repersentation();
+        let forward_refrence = parse_namespaces(forward_refrence, &name);
         let forward_refrence = parse_lambdas(&forward_refrence, lambda_names);
 
         forward_refrences.insert(forward_refrence);
@@ -951,12 +898,28 @@ fn is_std_namespace(data: &pdb::TypeData<'_>) -> bool {
     })
 }
 
+fn sort_with_dependancies(
+    mut classes_and_unions: HashMap<String, HashSet<String>>,
+) -> Result<Vec<String>> {
+    let mut topo_sort = TopoSort::with_capacity(classes_and_unions.len());
+    for (class, unions) in classes_and_unions.drain() {
+        topo_sort.insert(class, unions);
+    }
+
+    match topo_sort.into_vec_nodes() {
+        SortResults::Full(nodes) => Ok(nodes),
+        SortResults::Partial(_) => bail!("Partial sort results"),
+    }
+}
+
 fn decompile_classes_unions_and_enums(
     type_finder: &pdb::TypeFinder<'_>,
     type_information: &pdb::TypeInformation,
     lambda_names: &mut Vec<String>,
 ) -> String {
-    let mut enums: HashSet<String> = HashSet::new();
+    // this is a hashmap becuase enums in the factorio pdb seem to exist multiple times with the same name.
+    // we are taking only the most recent occurance.
+    let mut enums: HashMap<String, String> = HashMap::new();
     let mut classes_and_unions: HashSet<String> = HashSet::new();
 
     let progressbar = indicatif::ProgressBar::new(type_information.len() as u64);
@@ -1005,13 +968,13 @@ fn decompile_classes_unions_and_enums(
             _ => return Ok(()),
         };
 
-        let s = convert_pdb_data_to_cpp_code(type_finder, data, &mut Vec::new());
-        let s = s.unwrap_or_else(|e| format!("/* error processing type index {type_index} {e}*/"));
-        let s = parse_namespaces(&s, &name);
+        let mut dc = DecompilationResult::from_data(type_finder, data);
+        let s = dc.repersentation();
+        let s = parse_namespaces(s, &name);
         let s = parse_lambdas(&s, lambda_names);
 
         if is_enum {
-            enums.insert(s);
+            enums.insert(name.into_owned(), s);
         } else {
             classes_and_unions.insert(s);
         }
@@ -1019,8 +982,10 @@ fn decompile_classes_unions_and_enums(
         Ok(())
     });
 
+    let enums: HashSet<String> = enums.drain().map(|(_, v)| v).collect();
     let mut enums: Vec<String> = enums.into_iter().collect();
     enums.sort();
+
     let mut classes_and_unions: Vec<String> = classes_and_unions.into_iter().collect();
     classes_and_unions.sort();
 

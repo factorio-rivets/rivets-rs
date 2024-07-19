@@ -26,6 +26,7 @@ dirs = "5.0.1"
 indicatif = "0.17.8"
 regex = "1.10.5"
 lazy-regex = "3.1.0"
+topo_sort = "0.4.0"
 
 [lints.clippy]
 nursery = { level = "warn", priority = -1 }
