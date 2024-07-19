@@ -32,7 +32,8 @@ topo_sort = "0.4.0"
 nursery = { level = "warn", priority = -1 }
 pedantic = { level = "warn", priority = -1 }
 unwrap_used = "warn"
-expect_used = "warn"
+expect_used = "allow"
+trivial_regex = "allow"
 
 [lib]
 name = "examplemod"

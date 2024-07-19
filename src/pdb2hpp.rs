@@ -1,6 +1,3 @@
-#![allow(clippy::expect_used)]
-#![allow(clippy::trivial_regex)]
-
 use anyhow::{bail, Result};
 use core::panic;
 use lazy_regex::regex;

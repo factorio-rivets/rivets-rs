@@ -86,7 +86,6 @@ fn inject() -> Result<()> {
     }
 
     // Duplicate the factorio stdout stream onto our own stdout.
-    #[allow(clippy::expect_used)]
     io::copy(
         &mut listener
             .incoming()
