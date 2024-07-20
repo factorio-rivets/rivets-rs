@@ -531,7 +531,8 @@ impl<'a> DecompilationResult<'a> {
             Some(pdb::TypeData::Bitfield(data)) => {
                 let dc =
                     DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
-                format!("{} : {}", dc.repersentation, data.length)
+                self.name_suffix = format!(" : {}", data.length);
+                format!("/* position {:3} */ {}", data.position, dc.repersentation)
             }
             Some(pdb::TypeData::ArgumentList(data)) => {
                 let mut args = String::new();
