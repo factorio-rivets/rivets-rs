@@ -200,26 +200,48 @@ struct DecompilationResult<'a> {
     type_finder: &'a pdb::TypeFinder<'a>,
     /// An interior-mutable set of all the base classes that this class inherits from.
     base_classes: RefCell<HashSet<String>>,
+    /// Used for array sizes. This data must be specfied after a type's name. ie `int my_int[4]` not `int[4] my_int`
+    name_suffix: String,
 }
 
 fn number_to_method_arg_name(i: usize) -> String {
-        match i {
-            0 => "a".to_string(),
-            1 => "b".to_string(),
-            2 => "c".to_string(),
-            3 => "d".to_string(),
-            4 => "e".to_string(),
-            5 => "f".to_string(),
-            6 => "g".to_string(),
-            _ => {
-                let remainder = i % 7;
-                let i = i / 7;
-                let mut s = number_to_method_arg_name(i);
-                s.push_str(&number_to_method_arg_name(remainder));
-                s
-            }
+    match i {
+        0 => "a".to_string(),
+        1 => "b".to_string(),
+        2 => "c".to_string(),
+        3 => "d".to_string(),
+        4 => "e".to_string(),
+        5 => "f".to_string(),
+        6 => "g".to_string(),
+        _ => {
+            let remainder = i % 7;
+            let i = i / 7;
+            let mut s = number_to_method_arg_name(i);
+            s.push_str(&number_to_method_arg_name(remainder));
+            s
         }
     }
+}
+
+/// Contains array dimensions as specified in the PDB. This is not what you expect:
+///
+/// * Dimensions are specified in terms of byte sizes, not element counts.
+/// * Multidimensional arrays aggregate the lower dimensions into the sizes of the higher
+///   dimensions.
+///
+/// Thus a `float[4][4]` has `dimensions: [16, 64]`. Determining array dimensions in terms
+/// of element counts requires determining the size of the `element_type` and iteratively
+/// dividing.
+fn array_dimensions(data: &pdb::ArrayType) -> String {
+    let mut dimensions = Vec::new();
+    let mut size = 1;
+    for dimension in data.dimensions.iter().rev() {
+        size *= dimension;
+        dimensions.push(size.to_string());
+    }
+    dimensions.reverse();
+    format!("[{}]", dimensions.join("]["))
+}
 
 impl<'a> DecompilationResult<'a> {
     /// Constructor for decompilation result based on a `pdb::TypeData`.
@@ -235,6 +257,7 @@ impl<'a> DecompilationResult<'a> {
             data: Some(data),
             type_finder,
             base_classes: RefCell::new(HashSet::new()),
+            name_suffix: String::new(),
         };
 
         dc.calculate_name();
@@ -260,6 +283,7 @@ impl<'a> DecompilationResult<'a> {
                 data: None,
                 type_finder,
                 base_classes: RefCell::new(HashSet::new()),
+                name_suffix: String::new(),
             },
         }
     }
@@ -306,8 +330,10 @@ impl<'a> DecompilationResult<'a> {
                 let dc = DecompilationResult::from_index(Some(self), type_finder, data.field_type);
                 let offset = data.offset;
                 let field_name = data.name.to_string();
-                let s = format!("/* offset {offset:3} */ {} {field_name}", dc.name);
-                s
+                format!(
+                    "/* offset {offset:3} */ {} {field_name}{}",
+                    dc.name, dc.name_suffix
+                )
             }
             Some(pdb::TypeData::StaticMember(data)) => {
                 let dc = DecompilationResult::from_index(Some(self), type_finder, data.field_type);
@@ -421,13 +447,15 @@ impl<'a> DecompilationResult<'a> {
                 format!("{}{}", modifier_string(*data), dc.repersentation)
             }
             Some(pdb::TypeData::Array(data)) => {
-                let mut suffix: String = String::new();
-                for size in &data.dimensions {
-                    suffix = format!("{suffix}[{size}]");
-                }
+                // I believe we can safely ignore the data.indexing_type field.
+                let dimensions = array_dimensions(data);
+                self.name_suffix = dimensions;
                 let dc =
                     DecompilationResult::from_index(Some(self), type_finder, data.element_type);
-                format!("{}{suffix}", dc.name)
+                match data.stride {
+                    Some(stride) => format!("/* stride {stride:3} */ {}", dc.repersentation),
+                    None => dc.repersentation,
+                }
             }
             Some(pdb::TypeData::Procedure(data)) => {
                 let dc =
@@ -507,6 +535,7 @@ impl<'a> DecompilationResult<'a> {
                     args.push_str(&dc.name);
                     args.push(' ');
                     args.push_str(&number_to_method_arg_name(i));
+                    args.push_str(&dc.name_suffix);
                     args.push(',');
                 }
                 args.pop(); // remove the last comma
@@ -936,7 +965,9 @@ fn is_std_namespace(data: &pdb::TypeData<'_>) -> bool {
     })
 }
 
-fn sort_with_dependencies(classes_and_unions: &HashMap<String, DecompilationResult>) -> Result<Vec<String>> {
+fn sort_with_dependencies(
+    classes_and_unions: &HashMap<String, DecompilationResult>,
+) -> Result<Vec<String>> {
     let mut topo_sort = TopoSort::with_capacity(classes_and_unions.len());
     for dc in classes_and_unions.values() {
         let dependencies = dc.dependencies.borrow();
