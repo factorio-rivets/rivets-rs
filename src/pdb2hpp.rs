@@ -204,7 +204,7 @@ struct DecompilationResult<'a> {
 
 impl<'a> DecompilationResult<'a> {
     /// Constructor for decompilation result based on a `pdb::TypeData`.
-    fn from_data(type_finder: &'a pdb::TypeFinder<'a>, data: pdb::TypeData<'a>) -> Self {
+    fn from_data(parent: Option<&Self>, type_finder: &'a pdb::TypeFinder<'a>, data: pdb::TypeData<'a>) -> Self {
         let mut dc = DecompilationResult {
             repersentation: String::new(),
             name: String::new(),
@@ -215,14 +215,17 @@ impl<'a> DecompilationResult<'a> {
         };
 
         dc.calculate_name();
+        if let Some(parent) = parent {
+            parent.drain_dependencies(&dc);
+        }
 
         dc
     }
 
     /// Constructor for decompilation result based on a `pdb::TypeIndex`.
-    fn from_index(type_finder: &'a pdb::TypeFinder<'a>, type_index: pdb::TypeIndex) -> Self {
+    fn from_index(parent: Option<&Self>, type_finder: &'a pdb::TypeFinder<'a>, type_index: pdb::TypeIndex) -> Self {
         match find_type(type_finder, type_index) {
-            Ok(data) => DecompilationResult::from_data(type_finder, data),
+            Ok(data) => DecompilationResult::from_data(parent, type_finder, data),
             Err(e) => DecompilationResult {
                 repersentation: format!("/* error processing type index {type_index} {e}*/"),
                 name: format!("/* error processing type index {type_index} {e}*/"),
@@ -239,12 +242,12 @@ impl<'a> DecompilationResult<'a> {
 
         self.name = match &self.data {
             Some(pdb::TypeData::Pointer(data)) => {
-                let dc = DecompilationResult::from_index(type_finder, data.underlying_type);
+                let dc = DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
                 format!("{}*", dc.name)
             }
 
             Some(pdb::TypeData::Modifier(data)) => {
-                let dc = DecompilationResult::from_index(type_finder, data.underlying_type);
+                let dc = DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
                 format!("{}{}", modifier_string(*data), dc.name)
             }
 
@@ -271,14 +274,16 @@ impl<'a> DecompilationResult<'a> {
         self.repersentation = match &self.data {
             Some(pdb::TypeData::Member(data)) => {
                 // A field inside a class
-                let dc = DecompilationResult::from_index(type_finder, data.field_type);
+                let dc = DecompilationResult::from_index(Some(self), type_finder, data.field_type);
                 let offset = data.offset;
-                let field_type = dc.name;
                 let field_name = data.name.to_string();
-                format!("/* offset {offset:3} */ {field_type} {field_name}")
+                let s = format!("/* offset {offset:3} */ {} {field_name}", dc.name);
+
+                self.dependencies.borrow_mut().insert(dc.raw_name().to_string());
+                s
             }
             Some(pdb::TypeData::StaticMember(data)) => {
-                let dc = DecompilationResult::from_index(type_finder, data.field_type);
+                let dc = DecompilationResult::from_index(Some(self), type_finder, data.field_type);
                 format!("static {}", dc.repersentation)
             }
             Some(pdb::TypeData::BaseClass(data)) => {
@@ -287,7 +292,7 @@ impl<'a> DecompilationResult<'a> {
                     is_virtual: false,
                 }
                 .as_string();
-                let dc = DecompilationResult::from_index(type_finder, data.base_class);
+                let dc = DecompilationResult::from_index(Some(self), type_finder, data.base_class);
                 let type_name = dc.name;
 
                 self.base_classes
@@ -310,7 +315,7 @@ impl<'a> DecompilationResult<'a> {
                 let mut fields: Vec<String> = Vec::new();
                 for field in data.fields.clone() {
                     let is_enumerate = matches!(field, pdb::TypeData::Enumerate(_));
-                    let dc = DecompilationResult::from_data(type_finder, field);
+                    let dc = DecompilationResult::from_data(Some(self), type_finder, field);
                     let mut s = dc.repersentation.to_string();
 
                     if !is_enumerate {
@@ -321,7 +326,7 @@ impl<'a> DecompilationResult<'a> {
                 }
                 if let Some(continuation) = data.continuation {
                     // recurse
-                    let dc = DecompilationResult::from_index(type_finder, continuation);
+                    let dc = DecompilationResult::from_index(Some(self), type_finder, continuation);
                     fields.push(format!("{};", dc.repersentation));
                 }
                 fields.join("\n")
@@ -337,7 +342,7 @@ impl<'a> DecompilationResult<'a> {
                     return;
                 }
 
-                let dc = DecompilationResult::from_index(type_finder, data.fields);
+                let dc = DecompilationResult::from_index(Some(self), type_finder, data.fields);
                 let mut fields = do_indent(&dc.repersentation);
 
                 for (identifier, template) in templates_map {
@@ -363,10 +368,10 @@ impl<'a> DecompilationResult<'a> {
                     return;
                 }
 
-                let dc = DecompilationResult::from_index(type_finder, data.fields);
+                let dc = DecompilationResult::from_index(Some(self), type_finder, data.fields);
                 let fields = do_indent(&dc.repersentation);
                 let underlying_dc =
-                    DecompilationResult::from_index(type_finder, data.underlying_type);
+                    DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
                 let underlying_type = underlying_dc.repersentation;
 
                 format!(
@@ -376,12 +381,12 @@ impl<'a> DecompilationResult<'a> {
             }
             Some(pdb::TypeData::Pointer(data)) => {
                 // Pointer to a diffrent datatype
-                let dc = DecompilationResult::from_index(type_finder, data.underlying_type);
+                let dc = DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
                 format!("{}*", dc.repersentation)
             }
             Some(pdb::TypeData::Modifier(data)) => {
                 // Wrapper around another type that describes a modifier. Can be const, volatile, or unaligned.
-                let dc = DecompilationResult::from_index(type_finder, data.underlying_type);
+                let dc = DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
                 format!("{}{}", modifier_string(*data), dc.repersentation)
             }
             Some(pdb::TypeData::Array(data)) => {
@@ -389,24 +394,24 @@ impl<'a> DecompilationResult<'a> {
                 for size in &data.dimensions {
                     suffix = format!("{suffix}[{size}]");
                 }
-                let dc = DecompilationResult::from_index(type_finder, data.element_type);
+                let dc = DecompilationResult::from_index(Some(self), type_finder, data.element_type);
                 format!("{}{suffix}", dc.name)
             }
             Some(pdb::TypeData::Procedure(data)) => {
-                let dc = DecompilationResult::from_index(type_finder, data.argument_list);
+                let dc = DecompilationResult::from_index(Some(self), type_finder, data.argument_list);
                 let args = dc.repersentation;
 
                 let return_type = data.return_type.map_or_else(
                     || "void".to_string(),
                     |return_type| {
-                        let dc = DecompilationResult::from_index(type_finder, return_type);
+                        let dc = DecompilationResult::from_index(Some(self), type_finder, return_type);
                         dc.name
                     },
                 );
                 format!("{return_type}({args})")
             }
             Some(pdb::TypeData::Nested(data)) => {
-                let dc = DecompilationResult::from_index(type_finder, data.nested_type);
+                let dc = DecompilationResult::from_index(Some(self), type_finder, data.nested_type);
                 format!(
                     "{}{}",
                     FieldAttributes {
@@ -418,7 +423,7 @@ impl<'a> DecompilationResult<'a> {
                 )
             }
             Some(pdb::TypeData::Method(data)) => {
-                let dc = DecompilationResult::from_index(type_finder, data.method_type);
+                let dc = DecompilationResult::from_index(Some(self), type_finder, data.method_type);
                 dc.method_to_string(&data.name.to_string(), Some(data.attributes))
             }
             Some(pdb::TypeData::OverloadedMethod(data)) => {
@@ -434,7 +439,7 @@ impl<'a> DecompilationResult<'a> {
                         } in method_list.methods
                         {
                             // hooray
-                            let dc = DecompilationResult::from_index(type_finder, method_type);
+                            let dc = DecompilationResult::from_index(Some(self), type_finder, method_type);
                             s.push(dc.method_to_string(&data.name.to_string(), Some(attributes)));
                         }
                         s.join(";\n")
@@ -449,17 +454,17 @@ impl<'a> DecompilationResult<'a> {
                 format!("todo! VirtualBaseClass {data:?}")
             }
             Some(pdb::TypeData::VirtualFunctionTablePointer(data)) => {
-                let dc = DecompilationResult::from_index(type_finder, data.table);
+                let dc = DecompilationResult::from_index(Some(self), type_finder, data.table);
                 format!("{}*", dc.repersentation)
             }
             Some(pdb::TypeData::Bitfield(data)) => {
-                let dc = DecompilationResult::from_index(type_finder, data.underlying_type);
+                let dc = DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
                 format!("{} : {}", dc.repersentation, data.length)
             }
             Some(pdb::TypeData::ArgumentList(data)) => {
                 let mut args = Vec::new();
                 for arg_type in data.arguments.clone() {
-                    let dc = DecompilationResult::from_index(type_finder, arg_type);
+                    let dc = DecompilationResult::from_index(Some(self), type_finder, arg_type);
                     args.push(dc.name.to_string());
                 }
                 args.join(",")
@@ -501,8 +506,7 @@ impl<'a> DecompilationResult<'a> {
         }
 
         if let Some(type_index) = data.fields {
-            let dc = DecompilationResult::from_index(self.type_finder, type_index);
-            self.drain_dependencies(&dc);
+            let dc = DecompilationResult::from_index(Some(self), self.type_finder, type_index);
             fields.push(dc.repersentation);
         }
 
@@ -552,7 +556,7 @@ impl<'a> DecompilationResult<'a> {
         let return_type = if is_destructor || function_attributes.is_constructor() {
             ""
         } else {
-            let dc = DecompilationResult::from_index(type_finder, return_type);
+            let dc = DecompilationResult::from_index(Some(self), type_finder, return_type);
             &format!("{} ", dc.name)
         };
 
@@ -566,7 +570,7 @@ impl<'a> DecompilationResult<'a> {
             .as_string()
         });
 
-        let dc = DecompilationResult::from_index(type_finder, arguments_list);
+        let dc = DecompilationResult::from_index(Some(self), type_finder, arguments_list);
         let arguments = dc.repersentation;
 
         format!("{field_attributes}{return_type}{calling_convention}{method_name}({arguments})",)
@@ -851,7 +855,7 @@ pub fn decompile_forward_refrences(
             _ => return Ok(()),
         }
 
-        let dc = DecompilationResult::from_data(type_finder, data);
+        let dc = DecompilationResult::from_data(None, type_finder, data);
         let forward_refrence = dc.namespaced_repersentation();
         let forward_refrence = parse_lambdas(&forward_refrence, lambda_names);
 
@@ -959,7 +963,7 @@ fn decompile_classes_unions_and_enums(
             _ => return Ok(()),
         };
 
-        let dc = DecompilationResult::from_data(type_finder, data);
+        let dc = DecompilationResult::from_data(None, type_finder, data);
         let s = dc.namespaced_repersentation();
         let s = parse_lambdas(&s, lambda_names);
 
