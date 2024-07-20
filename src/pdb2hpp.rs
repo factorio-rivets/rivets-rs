@@ -202,9 +202,32 @@ struct DecompilationResult<'a> {
     base_classes: RefCell<HashSet<String>>,
 }
 
+fn number_to_method_arg_name(i: usize) -> String {
+        match i {
+            0 => "a".to_string(),
+            1 => "b".to_string(),
+            2 => "c".to_string(),
+            3 => "d".to_string(),
+            4 => "e".to_string(),
+            5 => "f".to_string(),
+            6 => "g".to_string(),
+            _ => {
+                let remainder = i % 7;
+                let i = i / 7;
+                let mut s = number_to_method_arg_name(i);
+                s.push_str(&number_to_method_arg_name(remainder));
+                s
+            }
+        }
+    }
+
 impl<'a> DecompilationResult<'a> {
     /// Constructor for decompilation result based on a `pdb::TypeData`.
-    fn from_data(parent: Option<&Self>, type_finder: &'a pdb::TypeFinder<'a>, data: pdb::TypeData<'a>) -> Self {
+    fn from_data(
+        parent: Option<&Self>,
+        type_finder: &'a pdb::TypeFinder<'a>,
+        data: pdb::TypeData<'a>,
+    ) -> Self {
         let mut dc = DecompilationResult {
             repersentation: String::new(),
             name: String::new(),
@@ -223,7 +246,11 @@ impl<'a> DecompilationResult<'a> {
     }
 
     /// Constructor for decompilation result based on a `pdb::TypeIndex`.
-    fn from_index(parent: Option<&Self>, type_finder: &'a pdb::TypeFinder<'a>, type_index: pdb::TypeIndex) -> Self {
+    fn from_index(
+        parent: Option<&Self>,
+        type_finder: &'a pdb::TypeFinder<'a>,
+        type_index: pdb::TypeIndex,
+    ) -> Self {
         match find_type(type_finder, type_index) {
             Ok(data) => DecompilationResult::from_data(parent, type_finder, data),
             Err(e) => DecompilationResult {
@@ -242,12 +269,14 @@ impl<'a> DecompilationResult<'a> {
 
         self.name = match &self.data {
             Some(pdb::TypeData::Pointer(data)) => {
-                let dc = DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
+                let dc =
+                    DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
                 format!("{}*", dc.name)
             }
 
             Some(pdb::TypeData::Modifier(data)) => {
-                let dc = DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
+                let dc =
+                    DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
                 format!("{}{}", modifier_string(*data), dc.name)
             }
 
@@ -278,8 +307,6 @@ impl<'a> DecompilationResult<'a> {
                 let offset = data.offset;
                 let field_name = data.name.to_string();
                 let s = format!("/* offset {offset:3} */ {} {field_name}", dc.name);
-
-                self.dependencies.borrow_mut().insert(dc.raw_name().to_string());
                 s
             }
             Some(pdb::TypeData::StaticMember(data)) => {
@@ -293,11 +320,13 @@ impl<'a> DecompilationResult<'a> {
                 }
                 .as_string();
                 let dc = DecompilationResult::from_index(Some(self), type_finder, data.base_class);
+                let raw_name = dc.raw_name().to_string();
                 let type_name = dc.name;
 
                 self.base_classes
                     .get_mut()
                     .insert(format!("{attributes}{type_name}"));
+                self.dependencies.get_mut().insert(raw_name);
 
                 format!(
                     "/* offset {:3} */ /* fields for {} */",
@@ -381,12 +410,14 @@ impl<'a> DecompilationResult<'a> {
             }
             Some(pdb::TypeData::Pointer(data)) => {
                 // Pointer to a diffrent datatype
-                let dc = DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
+                let dc =
+                    DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
                 format!("{}*", dc.repersentation)
             }
             Some(pdb::TypeData::Modifier(data)) => {
                 // Wrapper around another type that describes a modifier. Can be const, volatile, or unaligned.
-                let dc = DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
+                let dc =
+                    DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
                 format!("{}{}", modifier_string(*data), dc.repersentation)
             }
             Some(pdb::TypeData::Array(data)) => {
@@ -394,17 +425,20 @@ impl<'a> DecompilationResult<'a> {
                 for size in &data.dimensions {
                     suffix = format!("{suffix}[{size}]");
                 }
-                let dc = DecompilationResult::from_index(Some(self), type_finder, data.element_type);
+                let dc =
+                    DecompilationResult::from_index(Some(self), type_finder, data.element_type);
                 format!("{}{suffix}", dc.name)
             }
             Some(pdb::TypeData::Procedure(data)) => {
-                let dc = DecompilationResult::from_index(Some(self), type_finder, data.argument_list);
+                let dc =
+                    DecompilationResult::from_index(Some(self), type_finder, data.argument_list);
                 let args = dc.repersentation;
 
                 let return_type = data.return_type.map_or_else(
                     || "void".to_string(),
                     |return_type| {
-                        let dc = DecompilationResult::from_index(Some(self), type_finder, return_type);
+                        let dc =
+                            DecompilationResult::from_index(Some(self), type_finder, return_type);
                         dc.name
                     },
                 );
@@ -439,7 +473,11 @@ impl<'a> DecompilationResult<'a> {
                         } in method_list.methods
                         {
                             // hooray
-                            let dc = DecompilationResult::from_index(Some(self), type_finder, method_type);
+                            let dc = DecompilationResult::from_index(
+                                Some(self),
+                                type_finder,
+                                method_type,
+                            );
                             s.push(dc.method_to_string(&data.name.to_string(), Some(attributes)));
                         }
                         s.join(";\n")
@@ -458,16 +496,21 @@ impl<'a> DecompilationResult<'a> {
                 format!("{}*", dc.repersentation)
             }
             Some(pdb::TypeData::Bitfield(data)) => {
-                let dc = DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
+                let dc =
+                    DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
                 format!("{} : {}", dc.repersentation, data.length)
             }
             Some(pdb::TypeData::ArgumentList(data)) => {
-                let mut args = Vec::new();
-                for arg_type in data.arguments.clone() {
+                let mut args = String::new();
+                for (i, arg_type) in data.arguments.clone().into_iter().enumerate() {
                     let dc = DecompilationResult::from_index(Some(self), type_finder, arg_type);
-                    args.push(dc.name.to_string());
+                    args.push_str(&dc.name);
+                    args.push(' ');
+                    args.push_str(&number_to_method_arg_name(i));
+                    args.push(',');
                 }
-                args.join(",")
+                args.pop(); // remove the last comma
+                args
             }
             Some(pdb::TypeData::MethodList(data)) => format!("todo! MethodList {data:?}"),
             _ => todo!(),
@@ -573,7 +616,7 @@ impl<'a> DecompilationResult<'a> {
         let dc = DecompilationResult::from_index(Some(self), type_finder, arguments_list);
         let arguments = dc.repersentation;
 
-        format!("{field_attributes}{return_type}{calling_convention}{method_name}({arguments})",)
+        format!("/* offset {:3} */ {field_attributes}{return_type}{calling_convention}{method_name}({arguments})", data.this_adjustment)
     }
 
     fn namespaced_repersentation(&self) -> String {
@@ -893,12 +936,13 @@ fn is_std_namespace(data: &pdb::TypeData<'_>) -> bool {
     })
 }
 
-fn sort_with_dependencies(
-    mut classes_and_unions: HashMap<String, HashSet<String>>,
-) -> Result<Vec<String>> {
+fn sort_with_dependencies(classes_and_unions: &HashMap<String, DecompilationResult>) -> Result<Vec<String>> {
     let mut topo_sort = TopoSort::with_capacity(classes_and_unions.len());
-    for (class, unions) in classes_and_unions.drain() {
-        topo_sort.insert(class, unions);
+    for dc in classes_and_unions.values() {
+        let dependencies = dc.dependencies.borrow();
+        let dependencies: Vec<String> = dependencies.iter().cloned().collect();
+        //println!("{} depends on {dependencies:?}", dc.raw_name());
+        topo_sort.insert(dc.raw_name().to_string(), dependencies);
     }
 
     match topo_sort.into_vec_nodes() {
@@ -915,7 +959,7 @@ fn decompile_classes_unions_and_enums(
     // this is a hashmap becuase enums in the factorio pdb seem to exist multiple times with the same name.
     // we are taking only the most recent occurance.
     let mut enums: HashMap<String, String> = HashMap::new();
-    let mut classes_and_unions: HashSet<String> = HashSet::new();
+    let mut classes_and_unions: HashMap<String, DecompilationResult> = HashMap::new();
 
     let progressbar = indicatif::ProgressBar::new(type_information.len() as u64);
     let mut i = 0;
@@ -964,13 +1008,13 @@ fn decompile_classes_unions_and_enums(
         };
 
         let dc = DecompilationResult::from_data(None, type_finder, data);
-        let s = dc.namespaced_repersentation();
-        let s = parse_lambdas(&s, lambda_names);
 
         if is_enum {
+            let s = dc.namespaced_repersentation();
+            let s = parse_lambdas(&s, lambda_names);
             enums.insert(name.into_owned(), s);
         } else {
-            classes_and_unions.insert(s);
+            classes_and_unions.insert(dc.raw_name().to_string(), dc);
         }
 
         Ok(())
@@ -980,8 +1024,18 @@ fn decompile_classes_unions_and_enums(
     let mut enums: Vec<String> = enums.into_iter().collect();
     enums.sort();
 
-    let mut classes_and_unions: Vec<String> = classes_and_unions.into_iter().collect();
-    classes_and_unions.sort();
+    let sort_order =
+        sort_with_dependencies(&classes_and_unions).unwrap_or_else(|_| vec!["err!".to_string()]);
+    let mut classes_and_unions: Vec<String> = sort_order
+        .into_iter()
+        .map(|name| {
+            let dc = classes_and_unions
+                .get(&name)
+                .expect("sort order will have all the names");
+            let s = dc.namespaced_repersentation();
+            parse_lambdas(&s, lambda_names)
+        })
+        .collect();
 
     let mut classes_unions_and_enums = enums;
     classes_unions_and_enums.append(&mut classes_and_unions);
