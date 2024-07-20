@@ -368,8 +368,9 @@ impl<'a> DecompilationResult<'a> {
             Some(pdb::TypeData::FieldList(data)) => {
                 // A list of fields inside a class
                 let mut fields: Vec<String> = Vec::new();
+                let mut is_enumerate = false;
                 for field in data.fields.clone() {
-                    let is_enumerate = matches!(field, pdb::TypeData::Enumerate(_));
+                    is_enumerate = matches!(field, pdb::TypeData::Enumerate(_));
                     let dc = DecompilationResult::from_data(Some(self), type_finder, field);
                     let mut s = dc.repersentation.to_string();
 
@@ -378,6 +379,10 @@ impl<'a> DecompilationResult<'a> {
                         s.push(';');
                     }
                     fields.push(s);
+                }
+                if is_enumerate {
+                    // if the last field in the field list is an enum, we must delete the last comma
+                    fields.last_mut().map(std::string::String::pop);
                 }
                 if let Some(continuation) = data.continuation {
                     // recurse
