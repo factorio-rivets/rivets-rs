@@ -75,9 +75,9 @@ struct FieldAttributes {
 impl FieldAttributes {
     fn as_string(&self) -> String {
         let mut s = match self.attributes.access() {
-            1 => "private ",
-            2 => "protected ",
-            3 => "public ",
+            1 => "private: ",
+            2 => "protected: ",
+            3 => "public: ",
             _ => "",
         }
         .to_string();
