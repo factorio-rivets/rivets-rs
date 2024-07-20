@@ -67,6 +67,19 @@ fn primitive_name(data: pdb::PrimitiveType) -> String {
     name
 }
 
+struct FunctionAttributes(pdb::FunctionAttributes);
+
+impl FunctionAttributes {
+    fn calling_convention(&self) -> String {
+        let calling_convention = CallingConvention(self.0.calling_convention());
+        calling_convention.as_cpp().to_string()
+    }
+
+    fn is_constructor(&self) -> bool {
+        self.0.is_constructor()
+    }
+}
+
 struct FieldAttributes {
     attributes: pdb::FieldAttributes,
     is_virtual: bool,
@@ -288,14 +301,47 @@ impl<'a> DecompilationResult<'a> {
         }
     }
 
+    /// invariant: the data parameter to this function must equal self.data
+    /// this invariant exists in order to enforce the type of the data parameter by the caller
+    fn function_pointer_to_string(&self, data: &pdb::ProcedureType) -> (String, String) {
+        // todo! actually check the invariant
+
+        let function_attributes = FunctionAttributes(data.attributes);
+        // function pointers are never constructors so that case is unchecked
+        let calling_convention = function_attributes.calling_convention();
+
+        let return_type = data.return_type.map_or_else(
+            || "void".to_string(),
+            |return_type| {
+                let dc = DecompilationResult::from_index(Some(self), self.type_finder, return_type);
+                dc.name
+            },
+        );
+
+        let dc = DecompilationResult::from_index(Some(self), self.type_finder, data.argument_list);
+        let arguments = &dc.repersentation;
+
+        (
+            format!("{return_type}({calling_convention}*"),
+            format!(")({arguments})"),
+        )
+    }
+
     fn calculate_name(&mut self) {
         let type_finder = self.type_finder;
 
         self.name = match &self.data {
             Some(pdb::TypeData::Pointer(data)) => {
+                // todo! handle data.pointerAttributes
                 let dc =
                     DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
-                format!("{}*", dc.name)
+                if let Some(pdb::TypeData::Procedure(data)) = dc.data {
+                    let (name, suffix) = dc.function_pointer_to_string(&data);
+                    self.name_suffix = suffix;
+                    name
+                } else {
+                    format!("{}*", dc.name)
+                }
             }
 
             Some(pdb::TypeData::Modifier(data)) => {
@@ -624,13 +670,12 @@ impl<'a> DecompilationResult<'a> {
             return format!("/* error processing method {method_name} */");
         };
 
-        let return_type = data.return_type;
-        let arguments_list = data.argument_list;
-        let function_attributes = data.attributes;
+        let function_attributes = FunctionAttributes(data.attributes);
 
         let type_finder = self.type_finder;
         let is_destructor = method_name.starts_with('~');
 
+        let return_type = data.return_type;
         let return_type = if is_destructor || function_attributes.is_constructor() {
             ""
         } else {
@@ -638,8 +683,7 @@ impl<'a> DecompilationResult<'a> {
             &format!("{} ", dc.name)
         };
 
-        let calling_convention =
-            CallingConvention(function_attributes.calling_convention()).as_cpp();
+        let calling_convention = function_attributes.calling_convention();
         let field_attributes = field_attributes.map_or_else(String::new, |field_attributes| {
             FieldAttributes {
                 attributes: field_attributes,
@@ -648,7 +692,7 @@ impl<'a> DecompilationResult<'a> {
             .as_string()
         });
 
-        let dc = DecompilationResult::from_index(Some(self), type_finder, arguments_list);
+        let dc = DecompilationResult::from_index(Some(self), type_finder, data.argument_list);
         let arguments = dc.repersentation;
 
         format!("/* offset {:3} */ {field_attributes}{return_type}{calling_convention}{method_name}({arguments})", data.this_adjustment)
@@ -1110,7 +1154,7 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
         typedefs_str.push_str(&format!("// typedef {from} {to};\n"));
     }
 
-    let includes = ["<cstdint>", "<chrono>", "<vector>", "<memory>"];
+    let includes = ["<cstdint>", "<chrono>", "<vector>", "<memory>", "<string>"];
     let includes: Vec<String> = includes.iter().map(|i| format!("#include {i}")).collect();
     let includes = includes.join("\n");
 
