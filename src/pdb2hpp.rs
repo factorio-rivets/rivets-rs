@@ -83,10 +83,10 @@ impl FieldAttributes {
         .to_string();
 
         if self.attributes.is_static() {
-            s = format!("static {s}");
+            s = format!("{s} static");
         }
         if self.is_virtual || self.attributes.is_virtual() || self.attributes.is_pure_virtual() {
-            s = format!("virtual {s}");
+            s = format!("{s} virtual");
         }
         s
     }
