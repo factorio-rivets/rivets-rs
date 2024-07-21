@@ -330,7 +330,7 @@ impl<'a> DecompilationResult<'a> {
     fn calculate_name(&mut self) {
         let type_finder = self.type_finder;
 
-        self.name = match &self.data {
+        self.name = replace_unnamed_types(&match &self.data {
             Some(pdb::TypeData::Pointer(data)) => {
                 // todo! handle data.pointerAttributes
                 let dc =
@@ -361,7 +361,7 @@ impl<'a> DecompilationResult<'a> {
                 self.name = self.repersentation.clone();
                 return;
             }
-        };
+        });
 
         self.calculate_repersentation();
     }
@@ -1069,28 +1069,21 @@ fn decompile_classes_unions_and_enums(
         }
 
         let mut is_enum = false;
-        let name = match &data {
+        match &data {
             pdb::TypeData::Class(data)
                 if !data.properties.forward_reference()
                     && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() =>
-            {
-                data.name.to_string()
-            }
+                    && !data.properties.scoped_definition() => {}
             pdb::TypeData::Union(data)
                 if !data.properties.forward_reference()
                     && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() =>
-            {
-                data.name.to_string()
-            }
+                    && !data.properties.scoped_definition() => {}
             pdb::TypeData::Enumeration(data)
                 if !data.properties.forward_reference()
                     && !data.properties.is_nested_type()
                     && !data.properties.scoped_definition() =>
             {
                 is_enum = true;
-                data.name.to_string()
             }
             _ => return Ok(()),
         };
@@ -1100,7 +1093,7 @@ fn decompile_classes_unions_and_enums(
         if is_enum {
             let s = dc.namespaced_repersentation();
             let s = parse_lambdas(&s, lambda_names);
-            enums.insert(name.into_owned(), s);
+            enums.insert(dc.name, s);
         } else {
             classes_and_unions.insert(dc.raw_name().to_string(), dc);
         }
@@ -1130,6 +1123,18 @@ fn decompile_classes_unions_and_enums(
     let mut classes_unions_and_enums = classes_unions_and_enums.join("\n");
     classes_unions_and_enums.push('\n');
     classes_unions_and_enums
+}
+
+pub fn replace_unnamed_types(s: &str) -> String {
+    regex!("<unnamed-(type|enum)-(.+?)>")
+        .replace_all(s, |captures: &regex::Captures| {
+            captures
+                .get(2)
+                .expect("Compiled regex will always have a capture group")
+                .as_str()
+                .to_owned()
+        })
+        .into_owned()
 }
 
 pub fn generate(pdb_path: &Path) -> Result<()> {
@@ -1176,15 +1181,7 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
         format!("lambda_{i}")
     }).into_owned();
 
-    header_file = regex!("<unnamed-(type|enum)-(.+?)>")
-        .replace_all(&header_file, |captures: &regex::Captures| {
-            captures
-                .get(2)
-                .expect("Compiled regex will always have a capture group")
-                .as_str()
-                .to_owned()
-        })
-        .into_owned();
+    header_file = replace_unnamed_types(&header_file);
 
     println!(
         "Writing to structs.hpp. File size: {} bytes.",
