@@ -1128,8 +1128,17 @@ fn decompile_classes_unions_and_enums(
     classes_unions_and_enums
 }
 
-pub fn replace_unnamed_types(s: &str) -> String {
-    regex!("<unnamed-(type|enum)-(.+?)>")
+fn replace_pointers_to_errors(s: &str) -> String {
+    regex!(r"/\* error processing type index 0x([\da-z]+) Support for types of kind 0x([\da-z]+) is not implemented\*/\*+;").replace_all(s,
+        |captures: &regex::Captures| {
+            let type_index = captures.get(1).expect("Compiled regex will always have a capture group").as_str();
+            let kind = captures.get(2).expect("Compiled regex will always have a capture group").as_str();
+            format!("/* error processing type index 0x{type_index} Support for types of kind 0x{kind} is not implemented*/;")
+        }).into_owned()
+}
+
+fn replace_unnamed_types(s: &str) -> String {
+    regex!(r"<unnamed-(type|enum)-(.+?)>")
         .replace_all(s, |captures: &regex::Captures| {
             captures
                 .get(2)
@@ -1185,6 +1194,7 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
     }).into_owned();
 
     header_file = replace_unnamed_types(&header_file);
+    header_file = replace_pointers_to_errors(&header_file);
 
     println!(
         "Writing to structs.hpp. File size: {} bytes.",
