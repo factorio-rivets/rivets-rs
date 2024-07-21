@@ -470,7 +470,7 @@ impl<'a> DecompilationResult<'a> {
             Some(pdb::TypeData::Enumeration(data)) => {
                 // An enum type in c++
                 // TODO handle data.properties
-                let type_name = data.name.to_string().into_owned();
+                let mut type_name = data.name.to_string().into_owned();
 
                 if data.properties.forward_reference() {
                     self.repersentation = format!("enum {type_name}");
@@ -483,8 +483,11 @@ impl<'a> DecompilationResult<'a> {
                     DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
                 let underlying_type = underlying_dc.repersentation;
 
+                if data.properties.is_nested_type() {
+                    type_name = type_name.split("::").last().unwrap_or(&type_name).to_string();
+                }
                 format!(
-                    "{}enum class {type_name} : {underlying_type} {{\n{fields}\n}}",
+                    "{}enum class {type_name} : {underlying_type} {{\n{fields}\n}};",
                     stringify_properties(data.properties),
                 )
             }
