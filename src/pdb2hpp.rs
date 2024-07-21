@@ -96,10 +96,10 @@ impl FieldAttributes {
         .to_string();
 
         if self.attributes.is_static() {
-            s = format!("{s} static");
+            s = format!("{s}static ");
         }
         if self.is_virtual || self.attributes.is_virtual() || self.attributes.is_pure_virtual() {
-            s = format!("{s} virtual");
+            s = format!("{s}virtual ");
         }
         s
     }
@@ -376,6 +376,9 @@ impl<'a> DecompilationResult<'a> {
                 let dc = DecompilationResult::from_index(Some(self), type_finder, data.field_type);
                 let offset = data.offset;
                 let field_name = data.name.to_string();
+                self.dependencies
+                    .get_mut()
+                    .insert(dc.raw_name().to_string());
                 format!(
                     "/* offset {offset:3} */ {} {field_name}{}",
                     dc.name, dc.name_suffix
@@ -1021,7 +1024,11 @@ fn sort_with_dependencies(
     let mut topo_sort = TopoSort::with_capacity(classes_and_unions.len());
     for dc in classes_and_unions.values() {
         let dependencies = dc.dependencies.borrow();
-        let dependencies: Vec<String> = dependencies.iter().cloned().collect();
+        let dependencies: Vec<String> = dependencies
+            .iter()
+            .filter(|d| classes_and_unions.contains_key(*d))
+            .cloned()
+            .collect();
         //println!("{} depends on {dependencies:?}", dc.raw_name());
         topo_sort.insert(dc.raw_name().to_string(), dependencies);
     }
