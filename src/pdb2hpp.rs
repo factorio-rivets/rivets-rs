@@ -197,6 +197,7 @@ fn find_type<'a>(
     Ok(type_finder.find(type_index)?.parse()?)
 }
 
+#[derive(Debug, Clone)]
 struct DecompilationResult<'a> {
     /// A multi-line string repersenting the c++ code that would generate this type
     repersentation: String,
@@ -211,6 +212,9 @@ struct DecompilationResult<'a> {
     /// A borrowed refrence to a pdb crate type finder.
     /// This type finder is shared across all `DecompilationResult` for a certian pdb file.
     type_finder: &'a pdb::TypeFinder<'a>,
+    /// A borrowed refrence to a hashmap of all the lambda structs in the pdb file.
+    /// This is necessary in case a class has an internal lambda union or struct.
+    nested_classes: &'a NestedClassesAndUnions<'a>,
     /// An interior-mutable set of all the base classes that this class inherits from.
     base_classes: RefCell<HashSet<String>>,
     /// Used for array sizes. This data must be specfied after a type's name. ie `int my_int[4]` not `int[4] my_int`
@@ -259,11 +263,13 @@ fn array_dimensions(data: &pdb::ArrayType) -> String {
 impl<'a> DecompilationResult<'a> {
     /// Constructor for decompilation result based on a `pdb::TypeData`.
     fn from_data(
+        nested_classes: &'a NestedClassesAndUnions<'a>,
         parent: Option<&Self>,
         type_finder: &'a pdb::TypeFinder<'a>,
         data: pdb::TypeData<'a>,
     ) -> Self {
         let mut dc = DecompilationResult {
+            nested_classes,
             repersentation: String::new(),
             name: String::new(),
             dependencies: RefCell::new(HashSet::new()),
@@ -283,13 +289,15 @@ impl<'a> DecompilationResult<'a> {
 
     /// Constructor for decompilation result based on a `pdb::TypeIndex`.
     fn from_index(
+        nested_classes: &'a NestedClassesAndUnions<'a>,
         parent: Option<&Self>,
         type_finder: &'a pdb::TypeFinder<'a>,
         type_index: pdb::TypeIndex,
     ) -> Self {
         match find_type(type_finder, type_index) {
-            Ok(data) => DecompilationResult::from_data(parent, type_finder, data),
+            Ok(data) => DecompilationResult::from_data(nested_classes, parent, type_finder, data),
             Err(e) => DecompilationResult {
+                nested_classes,
                 repersentation: format!("/* error processing type index {type_index} {e}*/"),
                 name: format!("/* error processing type index {type_index} {e}*/"),
                 dependencies: RefCell::new(HashSet::new()),
@@ -313,12 +321,22 @@ impl<'a> DecompilationResult<'a> {
         let return_type = data.return_type.map_or_else(
             || "void".to_string(),
             |return_type| {
-                let dc = DecompilationResult::from_index(Some(self), self.type_finder, return_type);
+                let dc = DecompilationResult::from_index(
+                    self.nested_classes,
+                    Some(self),
+                    self.type_finder,
+                    return_type,
+                );
                 dc.name
             },
         );
 
-        let dc = DecompilationResult::from_index(Some(self), self.type_finder, data.argument_list);
+        let dc = DecompilationResult::from_index(
+            self.nested_classes,
+            Some(self),
+            self.type_finder,
+            data.argument_list,
+        );
         let arguments = &dc.repersentation;
 
         (
@@ -333,8 +351,12 @@ impl<'a> DecompilationResult<'a> {
         self.name = replace_unnamed_types(&match &self.data {
             Some(pdb::TypeData::Pointer(data)) => {
                 // todo! handle data.pointerAttributes
-                let dc =
-                    DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
+                let dc = DecompilationResult::from_index(
+                    self.nested_classes,
+                    Some(self),
+                    type_finder,
+                    data.underlying_type,
+                );
                 if let Some(pdb::TypeData::Procedure(data)) = dc.data {
                     let (name, suffix) = dc.function_pointer_to_string(&data);
                     self.name_suffix = suffix;
@@ -345,8 +367,12 @@ impl<'a> DecompilationResult<'a> {
             }
 
             Some(pdb::TypeData::Modifier(data)) => {
-                let dc =
-                    DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
+                let dc = DecompilationResult::from_index(
+                    self.nested_classes,
+                    Some(self),
+                    type_finder,
+                    data.underlying_type,
+                );
                 format!("{}{}", modifier_string(*data), dc.name)
             }
 
@@ -373,19 +399,36 @@ impl<'a> DecompilationResult<'a> {
         self.repersentation = match &self.data {
             Some(pdb::TypeData::Member(data)) => {
                 // A field inside a class
-                let dc = DecompilationResult::from_index(Some(self), type_finder, data.field_type);
+                // todo! handle data.attributes
+                let dc = DecompilationResult::from_index(
+                    self.nested_classes,
+                    Some(self),
+                    type_finder,
+                    data.field_type,
+                );
                 let offset = data.offset;
-                let field_name = data.name.to_string();
-                self.dependencies
-                    .get_mut()
-                    .insert(dc.raw_name().to_string());
+                let field_name = data.name.to_string().into_owned();
+                let raw_name = dc.raw_name().to_string();
+                let mut type_name = dc.name;
+
+                if let Some(nested_class) = self.nested_classes.find(&type_name) {
+                    type_name = nested_class.repersentation;
+                } else {
+                    self.dependencies.get_mut().insert(raw_name);
+                }
+
                 format!(
-                    "/* offset {offset:3} */ {} {field_name}{}",
-                    dc.name, dc.name_suffix
+                    "/* offset {offset:3} */ {type_name} {field_name}{}",
+                    dc.name_suffix
                 )
             }
             Some(pdb::TypeData::StaticMember(data)) => {
-                let dc = DecompilationResult::from_index(Some(self), type_finder, data.field_type);
+                let dc = DecompilationResult::from_index(
+                    self.nested_classes,
+                    Some(self),
+                    type_finder,
+                    data.field_type,
+                );
                 format!("static {}", dc.repersentation)
             }
             Some(pdb::TypeData::BaseClass(data)) => {
@@ -394,7 +437,12 @@ impl<'a> DecompilationResult<'a> {
                     is_virtual: false,
                 }
                 .as_string();
-                let dc = DecompilationResult::from_index(Some(self), type_finder, data.base_class);
+                let dc = DecompilationResult::from_index(
+                    self.nested_classes,
+                    Some(self),
+                    type_finder,
+                    data.base_class,
+                );
                 let raw_name = dc.raw_name().to_string();
                 let type_name = dc.name;
 
@@ -420,8 +468,16 @@ impl<'a> DecompilationResult<'a> {
                 let mut is_enumerate = false;
                 for field in data.fields.clone() {
                     is_enumerate = matches!(field, pdb::TypeData::Enumerate(_));
-                    let dc = DecompilationResult::from_data(Some(self), type_finder, field);
+                    let dc = DecompilationResult::from_data(
+                        self.nested_classes,
+                        Some(self),
+                        type_finder,
+                        field,
+                    );
                     let mut s = dc.repersentation.to_string();
+                    if s.is_empty() {
+                        continue;
+                    }
 
                     if !is_enumerate {
                         // if we dont have an enum, we need to add a semicolon
@@ -435,7 +491,12 @@ impl<'a> DecompilationResult<'a> {
                 }
                 if let Some(continuation) = data.continuation {
                     // recurse
-                    let dc = DecompilationResult::from_index(Some(self), type_finder, continuation);
+                    let dc = DecompilationResult::from_index(
+                        self.nested_classes,
+                        Some(self),
+                        type_finder,
+                        continuation,
+                    );
                     fields.push(format!("{};", dc.repersentation));
                 }
                 fields.join("\n")
@@ -443,6 +504,11 @@ impl<'a> DecompilationResult<'a> {
             Some(pdb::TypeData::Union(data)) => {
                 // A union type in c++
                 // TODO handle data.properties
+                let is_top_level = data.properties.sealed();
+                if data.properties.is_nested_type() && !is_top_level {
+                    return;
+                }
+
                 let type_name = data.name.to_string().into_owned();
                 let (templates, type_name, templates_map) = parse_template_types(&type_name);
 
@@ -452,17 +518,30 @@ impl<'a> DecompilationResult<'a> {
                     return;
                 }
 
-                let dc = DecompilationResult::from_index(Some(self), type_finder, data.fields);
+                let dc = DecompilationResult::from_index(
+                    self.nested_classes,
+                    Some(self),
+                    type_finder,
+                    data.fields,
+                );
                 let mut fields = do_indent(&dc.repersentation);
 
                 for (identifier, template) in templates_map {
                     fields = fields.replace(&template, &identifier);
                 }
 
-                format!(
-                    "{}{templates}union {properties}{type_name} {{\n{fields}\n}}",
-                    stringify_properties(data.properties),
-                )
+                if data.properties.is_nested_type() && is_top_level {
+                    // This is an anonymous union inside a class. Hide the type_name
+                    format!(
+                        "{}{templates}union {{\n{fields}\n}}",
+                        stringify_properties(data.properties),
+                    )
+                } else {    
+                    format!(
+                        "{}{templates}union {type_name} {{\n{fields}\n}}",
+                        stringify_properties(data.properties),
+                    )
+                }
             }
             Some(pdb::TypeData::Enumerate(data)) => {
                 // One of the values inside an enum
@@ -478,14 +557,27 @@ impl<'a> DecompilationResult<'a> {
                     return;
                 }
 
-                let dc = DecompilationResult::from_index(Some(self), type_finder, data.fields);
+                let dc = DecompilationResult::from_index(
+                    self.nested_classes,
+                    Some(self),
+                    type_finder,
+                    data.fields,
+                );
                 let fields = do_indent(&dc.repersentation);
-                let underlying_dc =
-                    DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
+                let underlying_dc = DecompilationResult::from_index(
+                    self.nested_classes,
+                    Some(self),
+                    type_finder,
+                    data.underlying_type,
+                );
                 let underlying_type = underlying_dc.repersentation;
 
                 if data.properties.is_nested_type() {
-                    type_name = type_name.split("::").last().unwrap_or(&type_name).to_string();
+                    type_name = type_name
+                        .split("::")
+                        .last()
+                        .unwrap_or(&type_name)
+                        .to_string();
                 }
                 format!(
                     "{}enum class {type_name} : {underlying_type} {{\n{fields}\n}};",
@@ -494,44 +586,69 @@ impl<'a> DecompilationResult<'a> {
             }
             Some(pdb::TypeData::Pointer(data)) => {
                 // Pointer to a diffrent datatype
-                let dc =
-                    DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
+                let dc = DecompilationResult::from_index(
+                    self.nested_classes,
+                    Some(self),
+                    type_finder,
+                    data.underlying_type,
+                );
                 format!("{}*", dc.repersentation)
             }
             Some(pdb::TypeData::Modifier(data)) => {
                 // Wrapper around another type that describes a modifier. Can be const, volatile, or unaligned.
-                let dc =
-                    DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
+                let dc = DecompilationResult::from_index(
+                    self.nested_classes,
+                    Some(self),
+                    type_finder,
+                    data.underlying_type,
+                );
                 format!("{}{}", modifier_string(*data), dc.repersentation)
             }
             Some(pdb::TypeData::Array(data)) => {
                 // I believe we can safely ignore the data.indexing_type field.
                 let dimensions = array_dimensions(data);
                 self.name_suffix = dimensions;
-                let dc =
-                    DecompilationResult::from_index(Some(self), type_finder, data.element_type);
+                let dc = DecompilationResult::from_index(
+                    self.nested_classes,
+                    Some(self),
+                    type_finder,
+                    data.element_type,
+                );
                 match data.stride {
                     Some(stride) => format!("/* stride {stride:3} */ {}", dc.repersentation),
                     None => dc.repersentation,
                 }
             }
             Some(pdb::TypeData::Procedure(data)) => {
-                let dc =
-                    DecompilationResult::from_index(Some(self), type_finder, data.argument_list);
+                let dc = DecompilationResult::from_index(
+                    self.nested_classes,
+                    Some(self),
+                    type_finder,
+                    data.argument_list,
+                );
                 let args = dc.repersentation;
 
                 let return_type = data.return_type.map_or_else(
                     || "void".to_string(),
                     |return_type| {
-                        let dc =
-                            DecompilationResult::from_index(Some(self), type_finder, return_type);
+                        let dc = DecompilationResult::from_index(
+                            self.nested_classes,
+                            Some(self),
+                            type_finder,
+                            return_type,
+                        );
                         dc.name
                     },
                 );
                 format!("{return_type}({args})")
             }
             Some(pdb::TypeData::Nested(data)) => {
-                let dc = DecompilationResult::from_index(Some(self), type_finder, data.nested_type);
+                let dc = DecompilationResult::from_index(
+                    self.nested_classes,
+                    Some(self),
+                    type_finder,
+                    data.nested_type,
+                );
                 format!(
                     "{}{}",
                     FieldAttributes {
@@ -543,7 +660,12 @@ impl<'a> DecompilationResult<'a> {
                 )
             }
             Some(pdb::TypeData::Method(data)) => {
-                let dc = DecompilationResult::from_index(Some(self), type_finder, data.method_type);
+                let dc = DecompilationResult::from_index(
+                    self.nested_classes,
+                    Some(self),
+                    type_finder,
+                    data.method_type,
+                );
                 dc.method_to_string(&data.name.to_string(), Some(data.attributes))
             }
             Some(pdb::TypeData::OverloadedMethod(data)) => {
@@ -560,6 +682,7 @@ impl<'a> DecompilationResult<'a> {
                         {
                             // hooray
                             let dc = DecompilationResult::from_index(
+                                self.nested_classes,
                                 Some(self),
                                 type_finder,
                                 method_type,
@@ -578,19 +701,33 @@ impl<'a> DecompilationResult<'a> {
                 format!("todo! VirtualBaseClass {data:?}")
             }
             Some(pdb::TypeData::VirtualFunctionTablePointer(data)) => {
-                let dc = DecompilationResult::from_index(Some(self), type_finder, data.table);
+                let dc = DecompilationResult::from_index(
+                    self.nested_classes,
+                    Some(self),
+                    type_finder,
+                    data.table,
+                );
                 format!("{}*", dc.repersentation)
             }
             Some(pdb::TypeData::Bitfield(data)) => {
-                let dc =
-                    DecompilationResult::from_index(Some(self), type_finder, data.underlying_type);
+                let dc = DecompilationResult::from_index(
+                    self.nested_classes,
+                    Some(self),
+                    type_finder,
+                    data.underlying_type,
+                );
                 self.name_suffix = format!(" : {}", data.length);
                 format!("/* position {:3} */ {}", data.position, dc.repersentation)
             }
             Some(pdb::TypeData::ArgumentList(data)) => {
                 let mut args = String::new();
                 for (i, arg_type) in data.arguments.clone().into_iter().enumerate() {
-                    let dc = DecompilationResult::from_index(Some(self), type_finder, arg_type);
+                    let dc = DecompilationResult::from_index(
+                        self.nested_classes,
+                        Some(self),
+                        type_finder,
+                        arg_type,
+                    );
                     args.push_str(&dc.name);
                     args.push(' ');
                     args.push_str(&number_to_method_arg_name(i));
@@ -637,7 +774,12 @@ impl<'a> DecompilationResult<'a> {
         }
 
         if let Some(type_index) = data.fields {
-            let dc = DecompilationResult::from_index(Some(self), self.type_finder, type_index);
+            let dc = DecompilationResult::from_index(
+                self.nested_classes,
+                Some(self),
+                self.type_finder,
+                type_index,
+            );
             fields.push(dc.repersentation);
         }
 
@@ -686,7 +828,12 @@ impl<'a> DecompilationResult<'a> {
         let return_type = if is_destructor || function_attributes.is_constructor() {
             ""
         } else {
-            let dc = DecompilationResult::from_index(Some(self), type_finder, return_type);
+            let dc = DecompilationResult::from_index(
+                self.nested_classes,
+                Some(self),
+                type_finder,
+                return_type,
+            );
             &format!("{} ", dc.name)
         };
 
@@ -699,7 +846,12 @@ impl<'a> DecompilationResult<'a> {
             .as_string()
         });
 
-        let dc = DecompilationResult::from_index(Some(self), type_finder, data.argument_list);
+        let dc = DecompilationResult::from_index(
+            self.nested_classes,
+            Some(self),
+            type_finder,
+            data.argument_list,
+        );
         let arguments = dc.repersentation;
 
         format!("/* offset {:3} */ {field_attributes}{return_type}{calling_convention}{method_name}({arguments})", data.this_adjustment)
@@ -741,7 +893,7 @@ fn split_templates(templates: &str) -> Vec<String> {
     let mut template_depth = 0;
 
     let chars: Vec<char> = templates.chars().collect();
-    
+
     for char in chars {
         match char {
             '<' | '(' => {
@@ -808,11 +960,7 @@ fn parse_template_types(class_name: &str) -> (String, String, HashMap<String, St
 
     // This handles the special case of my_namespace::<unnamed-class-MyClass>
     if class_name_without_templates.ends_with("::") {
-        return (
-            String::new(),
-            class_name.to_string(),
-            HashMap::new(),
-        );
+        return (String::new(), class_name.to_string(), HashMap::new());
     }
 
     let templates = captures
@@ -969,9 +1117,71 @@ fn typedefs() -> HashMap<&'static str, &'static str> {
     typedefs
 }
 
+#[derive(Clone, Debug)]
+struct NestedClassesAndUnions<'a> {
+    by_data: HashMap<String, pdb::TypeData<'a>>,
+    type_finder: &'a pdb::TypeFinder<'a>,
+}
+
+impl<'a> NestedClassesAndUnions<'a> {
+    fn new(type_finder: &'a pdb::TypeFinder<'a>, type_information: &pdb::TypeInformation) -> Self {
+        let mut by_data = HashMap::new();
+
+        let _ = type_information.iter().for_each(|symbol| {
+            let type_index = symbol.index();
+            let Ok(data) = type_finder.find(type_index)?.parse() else {
+                return Ok(());
+            };
+
+            if is_std_namespace(&data) {
+                return Ok(());
+            }
+
+            let name = replace_unnamed_types(
+                &match &data {
+                    pdb::TypeData::Class(data)
+                        if data.properties.is_nested_type() && data.properties.sealed() =>
+                    {
+                        data.name
+                    }
+                    pdb::TypeData::Union(data)
+                        if data.properties.is_nested_type() && data.properties.sealed() =>
+                    {
+                        data.name
+                    }
+                    _ => return Ok(()),
+                }
+                .to_string(),
+            );
+
+            by_data.insert(name, data);
+
+            Ok(())
+        });
+
+        println!("{:?}", by_data.keys().collect::<Vec<_>>());
+
+        Self {
+            by_data,
+            type_finder,
+        }
+    }
+
+    fn find(&self, name: &str) -> Option<DecompilationResult<'_>> {
+        let data = self.by_data.get(name)?;
+        Some(DecompilationResult::from_data(
+            self,
+            None,
+            self.type_finder,
+            data.clone(),
+        ))
+    }
+}
+
 /// Get all possible forward refrences at the top of the header.hpp so bindgen/clang doesn't compain.
-pub fn decompile_forward_refrences(
-    type_finder: &pdb::TypeFinder<'_>,
+fn decompile_forward_refrences<'a>(
+    nested_classes: &'a NestedClassesAndUnions<'a>,
+    type_finder: &'a pdb::TypeFinder<'_>,
     type_information: &pdb::TypeInformation,
     lambda_names: &mut Vec<String>,
 ) -> String {
@@ -989,15 +1199,13 @@ pub fn decompile_forward_refrences(
 
         match &data {
             pdb::TypeData::Class(data)
-                if data.properties.forward_reference()
-                    && !data.properties.is_nested_type() => {}
+                if data.properties.forward_reference() && !data.properties.is_nested_type() => {}
             pdb::TypeData::Union(data)
-                if data.properties.forward_reference()
-                    && !data.properties.is_nested_type() => {}
+                if data.properties.forward_reference() && !data.properties.is_nested_type() => {}
             _ => return Ok(()),
         }
 
-        let dc = DecompilationResult::from_data(None, type_finder, data);
+        let dc = DecompilationResult::from_data(nested_classes, None, type_finder, data);
         let forward_refrence = dc.namespaced_repersentation();
         let forward_refrence = parse_lambdas(&forward_refrence, lambda_names);
 
@@ -1056,8 +1264,9 @@ fn sort_with_dependencies(
     }
 }
 
-fn decompile_classes_unions_and_enums(
-    type_finder: &pdb::TypeFinder<'_>,
+fn decompile_classes_unions_and_enums<'a>(
+    nested_classes: &'a NestedClassesAndUnions<'a>,
+    type_finder: &'a pdb::TypeFinder<'_>,
     type_information: &pdb::TypeInformation,
     lambda_names: &mut Vec<String>,
 ) -> String {
@@ -1088,21 +1297,18 @@ fn decompile_classes_unions_and_enums(
         let mut is_enum = false;
         match &data {
             pdb::TypeData::Class(data)
-                if !data.properties.forward_reference()
-                    && !data.properties.is_nested_type() => {}
+                if !data.properties.forward_reference() && !data.properties.is_nested_type() => {}
             pdb::TypeData::Union(data)
-                /*if !data.properties.forward_reference()
-                    && !data.properties.is_nested_type()*/ => {}
+                if !data.properties.forward_reference() && !data.properties.is_nested_type() => {}
             pdb::TypeData::Enumeration(data)
-                if !data.properties.forward_reference()
-                    && !data.properties.is_nested_type() =>
+                if !data.properties.forward_reference() && !data.properties.is_nested_type() =>
             {
                 is_enum = true;
             }
             _ => return Ok(()),
         };
 
-        let dc = DecompilationResult::from_data(None, type_finder, data);
+        let dc = DecompilationResult::from_data(nested_classes, None, type_finder, data);
 
         if is_enum {
             let s = dc.namespaced_repersentation();
@@ -1173,11 +1379,20 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
         type_finder.update(&type_iter);
     }
 
+    let nested_classes = NestedClassesAndUnions::new(&type_finder, &type_information);
     let mut lambda_names = Vec::new();
-    let mut classes_unions_and_enums =
-        decompile_classes_unions_and_enums(&type_finder, &type_information, &mut lambda_names);
-    let forward_refrences =
-        decompile_forward_refrences(&type_finder, &type_information, &mut lambda_names);
+    let mut classes_unions_and_enums = decompile_classes_unions_and_enums(
+        &nested_classes,
+        &type_finder,
+        &type_information,
+        &mut lambda_names,
+    );
+    let forward_refrences = decompile_forward_refrences(
+        &nested_classes,
+        &type_finder,
+        &type_information,
+        &mut lambda_names,
+    );
 
     let mut typedefs_str = String::new();
     for (from, to) in typedefs() {
@@ -1189,7 +1404,14 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
         typedefs_str.push_str(&format!("// typedef {from} {to};\n"));
     }
 
-    let includes = ["<cstdint>", "<chrono>", "<vector>", "<memory>", "<string>", "<functional>"];
+    let includes = [
+        "<cstdint>",
+        "<chrono>",
+        "<vector>",
+        "<memory>",
+        "<string>",
+        "<functional>",
+    ];
     let includes: Vec<String> = includes.iter().map(|i| format!("#include {i}")).collect();
     let includes = includes.join("\n");
 
