@@ -514,7 +514,7 @@ impl<'a> DecompilationResult<'a> {
 
                 let properties = stringify_properties(data.properties);
                 if data.properties.forward_reference() {
-                    self.repersentation = format!("union {properties}{type_name}");
+                    self.repersentation = format!("{properties}union {type_name}");
                     return;
                 }
 
@@ -536,7 +536,7 @@ impl<'a> DecompilationResult<'a> {
                         "{}{templates}union {{\n{fields}\n}}",
                         stringify_properties(data.properties),
                     )
-                } else {    
+                } else {
                     format!(
                         "{}{templates}union {type_name} {{\n{fields}\n}}",
                         stringify_properties(data.properties),
@@ -756,6 +756,7 @@ impl<'a> DecompilationResult<'a> {
             return format!("/* error processing class {name} */");
         };
 
+        let properties = stringify_properties(data.properties);
         let (templates, name, templates_map) = parse_template_types(name);
         let kind = match data.kind {
             pdb::ClassKind::Class => "class",
@@ -764,7 +765,7 @@ impl<'a> DecompilationResult<'a> {
         };
 
         if data.properties.forward_reference() {
-            return format!("{templates}{kind} {name}");
+            return format!("{properties}{templates}{kind} {name}");
         }
 
         let mut fields: Vec<String> = Vec::new();
@@ -795,10 +796,7 @@ impl<'a> DecompilationResult<'a> {
             base_classes = base_classes.replace(&template, &identifier);
         }
 
-        format!(
-            "{}{templates}{kind} {name}{base_classes} {{\n{fields}\n}}",
-            stringify_properties(data.properties)
-        )
+        format!("{properties}{templates}{kind} {name}{base_classes} {{\n{fields}\n}}")
     }
 
     fn drain_dependencies(&self, other: &Self) {
@@ -1159,7 +1157,7 @@ impl<'a> NestedClassesAndUnions<'a> {
             Ok(())
         });
 
-        println!("{:?}", by_data.keys().collect::<Vec<_>>());
+        //println!("{:?}", by_data.keys().collect::<Vec<_>>());
 
         Self {
             by_data,
@@ -1199,9 +1197,13 @@ fn decompile_forward_refrences<'a>(
 
         match &data {
             pdb::TypeData::Class(data)
-                if data.properties.forward_reference() && !data.properties.is_nested_type() => {}
+                if data.properties.forward_reference()
+                    && !data.properties.is_nested_type()
+                    && !data.properties.scoped_definition() => {}
             pdb::TypeData::Union(data)
-                if data.properties.forward_reference() && !data.properties.is_nested_type() => {}
+                if data.properties.forward_reference()
+                    && !data.properties.is_nested_type()
+                    && !data.properties.scoped_definition() => {}
             _ => return Ok(()),
         }
 
@@ -1297,11 +1299,17 @@ fn decompile_classes_unions_and_enums<'a>(
         let mut is_enum = false;
         match &data {
             pdb::TypeData::Class(data)
-                if !data.properties.forward_reference() && !data.properties.is_nested_type() => {}
+                if !data.properties.forward_reference()
+                    && !data.properties.is_nested_type()
+                    && !data.properties.scoped_definition() => {}
             pdb::TypeData::Union(data)
-                if !data.properties.forward_reference() && !data.properties.is_nested_type() => {}
+                if !data.properties.forward_reference()
+                    && !data.properties.is_nested_type()
+                    && !data.properties.scoped_definition() => {}
             pdb::TypeData::Enumeration(data)
-                if !data.properties.forward_reference() && !data.properties.is_nested_type() =>
+                if !data.properties.forward_reference()
+                    && !data.properties.is_nested_type()
+                    && !data.properties.scoped_definition() =>
             {
                 is_enum = true;
             }
