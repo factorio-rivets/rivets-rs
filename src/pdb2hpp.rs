@@ -409,10 +409,13 @@ impl<'a> DecompilationResult<'a> {
                 let offset = data.offset;
                 let field_name = data.name.to_string().into_owned();
                 let raw_name = dc.raw_name().to_string();
+                let mut dependencies = dc.dependencies;
+                let mut base_classes = dc.base_classes;
                 let mut type_name = dc.name;
 
                 if let Some(nested_class) = self.nested_classes.find(&type_name) {
                     type_name = nested_class.repersentation;
+                    self.drain_dependencies_inner(dependencies.get_mut(), base_classes.get_mut());
                 } else {
                     self.dependencies.get_mut().insert(raw_name);
                 }
@@ -800,12 +803,12 @@ impl<'a> DecompilationResult<'a> {
     }
 
     fn drain_dependencies(&self, other: &Self) {
-        self.dependencies
-            .borrow_mut()
-            .extend(other.dependencies.borrow_mut().drain());
-        self.base_classes
-            .borrow_mut()
-            .extend(other.base_classes.borrow_mut().drain());
+        self.drain_dependencies_inner(&mut other.dependencies.borrow_mut(), &mut other.base_classes.borrow_mut());
+    }
+
+    fn drain_dependencies_inner(&self, dependencies: &mut HashSet<String>, base_classes: &mut HashSet<String>) {
+        self.base_classes.borrow_mut().extend(base_classes.drain());
+        self.dependencies.borrow_mut().extend(dependencies.drain());
     }
 
     fn method_to_string(
@@ -1420,6 +1423,11 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
         "<string>",
         "<functional>",
         "<map>",
+        "<deque>",
+        "<set>",
+        "<atomic>",
+        "<mutex>",
+        "<condition_variable>",
     ];
     let includes: Vec<String> = includes.iter().map(|i| format!("#include {i}")).collect();
     let includes = includes.join("\n");
