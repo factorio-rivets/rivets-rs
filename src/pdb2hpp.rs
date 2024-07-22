@@ -446,8 +446,9 @@ impl<'a> DecompilationResult<'a> {
                 let type_name = data.name.to_string().into_owned();
                 let (templates, type_name, templates_map) = parse_template_types(&type_name);
 
+                let properties = stringify_properties(data.properties);
                 if data.properties.forward_reference() {
-                    self.repersentation = format!("union {type_name}");
+                    self.repersentation = format!("union {properties}{type_name}");
                     return;
                 }
 
@@ -459,7 +460,7 @@ impl<'a> DecompilationResult<'a> {
                 }
 
                 format!(
-                    "{}{templates}union {type_name} {{\n{fields}\n}}",
+                    "{}{templates}union {properties}{type_name} {{\n{fields}\n}}",
                     stringify_properties(data.properties),
                 )
             }
@@ -740,7 +741,7 @@ fn split_templates(templates: &str) -> Vec<String> {
     let mut template_depth = 0;
 
     let chars: Vec<char> = templates.chars().collect();
-
+    
     for char in chars {
         match char {
             '<' | '(' => {
@@ -749,6 +750,9 @@ fn split_templates(templates: &str) -> Vec<String> {
             }
             '>' | ')' => {
                 template_depth -= 1;
+                if template_depth < 0 {
+                    template_depth = 0;
+                }
                 current.push(char);
             }
             ',' if template_depth == 0 => {
@@ -768,6 +772,9 @@ fn split_templates(templates: &str) -> Vec<String> {
     result
 }
 
+/// Figures out the template types based on the class name stored in the PDB.
+/// For example `my_namespace::MyClass<int, std::string>` would return:
+/// `("template <typename T, typename U> ", "MyClass", {"T": "int", "U": "std::string"})`
 fn parse_template_types(class_name: &str) -> (String, String, HashMap<String, String>) {
     /// Converts a number into base 7 where each digit is a letter from T, U, V, W, X, Y, Z.
     fn number_to_template_type_name(i: usize) -> String {
@@ -798,6 +805,15 @@ fn parse_template_types(class_name: &str) -> (String, String, HashMap<String, St
         .get(1)
         .expect("Static regex always has one group")
         .as_str();
+
+    // This handles the special case of my_namespace::<unnamed-class-MyClass>
+    if class_name_without_templates.ends_with("::") {
+        return (
+            String::new(),
+            class_name.to_string(),
+            HashMap::new(),
+        );
+    }
 
     let templates = captures
         .get(2)
@@ -974,12 +990,10 @@ pub fn decompile_forward_refrences(
         match &data {
             pdb::TypeData::Class(data)
                 if data.properties.forward_reference()
-                    && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() => {}
+                    && !data.properties.is_nested_type() => {}
             pdb::TypeData::Union(data)
                 if data.properties.forward_reference()
-                    && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() => {}
+                    && !data.properties.is_nested_type() => {}
             _ => return Ok(()),
         }
 
@@ -1075,16 +1089,13 @@ fn decompile_classes_unions_and_enums(
         match &data {
             pdb::TypeData::Class(data)
                 if !data.properties.forward_reference()
-                    && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() => {}
+                    && !data.properties.is_nested_type() => {}
             pdb::TypeData::Union(data)
-                if !data.properties.forward_reference()
-                    && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() => {}
+                /*if !data.properties.forward_reference()
+                    && !data.properties.is_nested_type()*/ => {}
             pdb::TypeData::Enumeration(data)
                 if !data.properties.forward_reference()
-                    && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() =>
+                    && !data.properties.is_nested_type() =>
             {
                 is_enum = true;
             }
@@ -1178,7 +1189,7 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
         typedefs_str.push_str(&format!("// typedef {from} {to};\n"));
     }
 
-    let includes = ["<cstdint>", "<chrono>", "<vector>", "<memory>", "<string>"];
+    let includes = ["<cstdint>", "<chrono>", "<vector>", "<memory>", "<string>", "<functional>"];
     let includes: Vec<String> = includes.iter().map(|i| format!("#include {i}")).collect();
     let includes = includes.join("\n");
 
