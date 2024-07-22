@@ -103,6 +103,21 @@ impl FieldAttributes {
         }
         s
     }
+
+    fn as_base_class_string(&self) -> String {
+        let mut s = match self.attributes.access() {
+            1 => "private ",
+            2 => "protected ",
+            3 => "public ",
+            _ => "",
+        }
+        .to_string();
+
+        if self.attributes.is_virtual() {
+            s = format!("{s}virtual ");
+        }
+        s
+    }
 }
 
 fn stringify_properties(properties: pdb::TypeProperties) -> String {
@@ -439,7 +454,7 @@ impl<'a> DecompilationResult<'a> {
                     attributes: data.attributes,
                     is_virtual: false,
                 }
-                .as_string();
+                .as_base_class_string();
                 let dc = DecompilationResult::from_index(
                     self.nested_classes,
                     Some(self),
@@ -799,7 +814,7 @@ impl<'a> DecompilationResult<'a> {
             base_classes = base_classes.replace(&template, &identifier);
         }
 
-        format!("{properties}{templates}{kind} {name}{base_classes} {{\n{fields}\n}}")
+        format!("{properties}{templates}{kind} {name} {base_classes} {{\n{fields}\n}}")
     }
 
     fn drain_dependencies(&self, other: &Self) {
