@@ -1,3 +1,5 @@
+mod symbol;
+
 use anyhow::{bail, Result};
 use core::panic;
 use lazy_regex::regex;
@@ -6,6 +8,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
+use symbol::Symbol;
 use topo_sort::{SortResults, TopoSort};
 
 use pdb::FallibleIterator;
@@ -161,50 +164,6 @@ fn stringify_properties(properties: pdb::TypeProperties) -> String {
     }
 }
 
-fn list_namespaces_as_vec(class_name: &str) -> Vec<String> {
-    let mut result = Vec::new();
-    let mut current = String::new();
-    let mut template_depth = 0;
-
-    let chars: Vec<char> = class_name.chars().collect();
-    let mut skip = false;
-
-    for (i, char) in chars.iter().enumerate() {
-        if skip {
-            skip = false;
-            continue;
-        }
-        match char {
-            '<' => {
-                template_depth += 1;
-                current.push('<');
-            }
-            '>' => {
-                template_depth -= 1;
-                current.push('>');
-            }
-            ':' if i + 1 < chars.len() && chars[i + 1] == ':' => {
-                if template_depth == 0 {
-                    result.push(current.trim().to_string());
-                    current.clear();
-                    skip = true; // skip the next ':'
-                } else {
-                    current.push(':');
-                }
-            }
-            _ => {
-                current.push(chars[i]);
-            }
-        }
-    }
-
-    if !current.is_empty() {
-        result.push(current.trim().to_string());
-    }
-
-    result
-}
-
 fn find_type<'a>(
     type_finder: &pdb::TypeFinder<'a>,
     type_index: pdb::TypeIndex,
@@ -216,8 +175,8 @@ fn find_type<'a>(
 struct DecompilationResult<'a> {
     /// A multi-line string repersenting the c++ code that would generate this type
     repersentation: String,
-    /// The full type name including namespaces and template types. ie `std::vector<int>`
-    name: String,
+    /// Thing that does stuff.
+    name: Symbol,
     /// An interior-mutable set of all the types that this type depends on. Used for topological sorting.
     /// This is required becuase clang expects all types to be defined before they are used.
     dependencies: RefCell<HashSet<String>>,
@@ -286,7 +245,7 @@ impl<'a> DecompilationResult<'a> {
         let mut dc = DecompilationResult {
             nested_classes,
             repersentation: String::new(),
-            name: String::new(),
+            name: Symbol::none(),
             dependencies: RefCell::new(HashSet::new()),
             data: Some(data),
             type_finder,
@@ -314,7 +273,7 @@ impl<'a> DecompilationResult<'a> {
             Err(e) => DecompilationResult {
                 nested_classes,
                 repersentation: format!("/* error processing type index {type_index} {e}*/"),
-                name: format!("/* error processing type index {type_index} {e}*/"),
+                name: Symbol::none(),
                 dependencies: RefCell::new(HashSet::new()),
                 data: None,
                 type_finder,
@@ -322,6 +281,21 @@ impl<'a> DecompilationResult<'a> {
                 name_suffix: String::new(),
             },
         }
+    }
+
+    fn parse_return_type(&self, return_type: Option<pdb::TypeIndex>) -> Symbol {
+        return_type.map_or_else(
+            || Symbol::from_string("void".to_string()),
+            |return_type| {
+                let dc = DecompilationResult::from_index(
+                    self.nested_classes,
+                    Some(self),
+                    self.type_finder,
+                    return_type,
+                );
+                dc.name
+            },
+        )
     }
 
     /// invariant: the data parameter to this function must equal self.data
@@ -333,18 +307,7 @@ impl<'a> DecompilationResult<'a> {
         // function pointers are never constructors so that case is unchecked
         let calling_convention = function_attributes.calling_convention();
 
-        let return_type = data.return_type.map_or_else(
-            || "void".to_string(),
-            |return_type| {
-                let dc = DecompilationResult::from_index(
-                    self.nested_classes,
-                    Some(self),
-                    self.type_finder,
-                    return_type,
-                );
-                dc.name
-            },
-        );
+        let return_type = self.parse_return_type(data.return_type);
 
         let dc = DecompilationResult::from_index(
             self.nested_classes,
@@ -363,7 +326,7 @@ impl<'a> DecompilationResult<'a> {
     fn calculate_name(&mut self) {
         let type_finder = self.type_finder;
 
-        self.name = replace_unnamed_types(&match &self.data {
+        self.name = match &self.data {
             Some(pdb::TypeData::Pointer(data)) => {
                 // todo! handle data.pointerAttributes
                 let dc = DecompilationResult::from_index(
@@ -375,9 +338,10 @@ impl<'a> DecompilationResult<'a> {
                 if let Some(pdb::TypeData::Procedure(data)) = dc.data {
                     let (name, suffix) = dc.function_pointer_to_string(&data);
                     self.name_suffix = suffix;
-                    name
+                    Symbol::from_string(name)
                 } else {
-                    format!("{}*", dc.name)
+                    dc.name.increment_pointer_count();
+                    dc.name
                 }
             }
 
@@ -388,21 +352,23 @@ impl<'a> DecompilationResult<'a> {
                     type_finder,
                     data.underlying_type,
                 );
-                format!("{}{}", modifier_string(*data), dc.name)
+                dc.name.add_modifiers(&modifier_string(*data));
+                dc.name
             }
 
-            Some(data) if data.name().is_some() => data
-                .name()
-                .expect("We already checked is_some")
-                .to_string()
-                .into_owned(),
+            Some(data) if data.name().is_some() => Symbol::new(
+                data.name()
+                    .expect("We already checked is_some")
+                    .to_string()
+                    .into_owned(),
+            ),
 
             _ => {
                 self.calculate_repersentation();
-                self.name = self.repersentation.clone();
+                self.name = Symbol::from_string(self.repersentation.clone());
                 return;
             }
-        });
+        };
 
         self.calculate_repersentation();
     }
@@ -423,16 +389,15 @@ impl<'a> DecompilationResult<'a> {
                 );
                 let offset = data.offset;
                 let field_name = data.name.to_string().into_owned();
-                let raw_name = dc.raw_name().to_string();
                 let mut dependencies = dc.dependencies;
                 let mut base_classes = dc.base_classes;
                 let mut type_name = dc.name;
 
                 if let Some(nested_class) = self.nested_classes.find(&type_name) {
-                    type_name = nested_class.repersentation;
+                    type_name = nested_class.name;
                     self.drain_dependencies_inner(dependencies.get_mut(), base_classes.get_mut());
                 } else {
-                    self.dependencies.get_mut().insert(raw_name);
+                    //self.dependencies.get_mut().insert(type_name.to_string());
                 }
 
                 format!(
@@ -461,17 +426,15 @@ impl<'a> DecompilationResult<'a> {
                     type_finder,
                     data.base_class,
                 );
-                let raw_name = dc.raw_name().to_string();
-                let type_name = dc.name;
 
                 self.base_classes
                     .get_mut()
-                    .insert(format!("{attributes}{type_name}"));
-                self.dependencies.get_mut().insert(raw_name);
+                    .insert(format!("{attributes}{}", dc.name));
+                self.dependencies.get_mut().insert(dc.name.to_string());
 
                 format!(
                     "/* offset {:3} */ /* fields for {} */",
-                    data.offset, type_name
+                    data.offset, dc.name
                 )
             }
             Some(pdb::TypeData::Primitive(data)) => primitive_name(*data), // A primitive type in c++. See primitive_name() for a full list.
@@ -528,7 +491,8 @@ impl<'a> DecompilationResult<'a> {
                 }
 
                 let type_name = data.name.to_string().into_owned();
-                let (templates, type_name, templates_map) = parse_template_types(&type_name);
+                let type_name = Symbol::new(type_name);
+                let templates: Vec<(String, String, String)> = type_name.templates_by_type();
 
                 let properties = stringify_properties(data.properties);
                 if data.properties.forward_reference() {
@@ -544,19 +508,20 @@ impl<'a> DecompilationResult<'a> {
                 );
                 let mut fields = do_indent(&dc.repersentation);
 
-                for (identifier, template) in templates_map {
-                    fields = fields.replace(&template, &identifier);
+                for (_, template, identifier) in &templates {
+                    fields = fields.replace(template, identifier);
                 }
 
+                let templates_prefix = Symbol::templates(&templates);
                 if data.properties.is_nested_type() && is_top_level {
                     // This is an anonymous union inside a class. Hide the type_name
                     format!(
-                        "{}{templates}union {{\n{fields}\n}}",
+                        "{}{templates_prefix}union {{\n{fields}\n}}",
                         stringify_properties(data.properties),
                     )
                 } else {
                     format!(
-                        "{}{templates}union {type_name} {{\n{fields}\n}}",
+                        "{}{templates_prefix}union {type_name} {{\n{fields}\n}}",
                         stringify_properties(data.properties),
                     )
                 }
@@ -646,18 +611,7 @@ impl<'a> DecompilationResult<'a> {
                 );
                 let args = dc.repersentation;
 
-                let return_type = data.return_type.map_or_else(
-                    || "void".to_string(),
-                    |return_type| {
-                        let dc = DecompilationResult::from_index(
-                            self.nested_classes,
-                            Some(self),
-                            type_finder,
-                            return_type,
-                        );
-                        dc.name
-                    },
-                );
+                let return_type = self.parse_return_type(data.return_type);
                 format!("{return_type}({args})")
             }
             Some(pdb::TypeData::Nested(data)) => {
@@ -746,7 +700,7 @@ impl<'a> DecompilationResult<'a> {
                         type_finder,
                         arg_type,
                     );
-                    args.push_str(&dc.name);
+                    args.push_str(dc.name.name());
                     args.push(' ');
                     args.push_str(&number_to_method_arg_name(i));
                     args.push_str(&dc.name_suffix);
@@ -760,30 +714,26 @@ impl<'a> DecompilationResult<'a> {
         };
     }
 
-    fn raw_name(&self) -> &str {
-        let name: &str = &self.name;
-        let index = name.find('<');
-        index.map_or_else(|| name, |index| &name[..index])
-    }
-
     fn class_to_string(&self) -> String {
-        let name = &self.name;
+        let type_name = &self.name;
         let data = self.data.as_ref();
 
         let Some(pdb::TypeData::Class(data)) = data else {
-            return format!("/* error processing class {name} */");
+            return format!("/* error processing class {type_name} */");
         };
 
         let properties = stringify_properties(data.properties);
-        let (templates, name, templates_map) = parse_template_types(name);
+        let templates: Vec<(String, String, String)> = type_name.templates_by_type();
+
         let kind = match data.kind {
             pdb::ClassKind::Class => "class",
             pdb::ClassKind::Struct => "struct",
             pdb::ClassKind::Interface => "interface", // when can this happen?
         };
 
+        let templates_prefix = Symbol::templates(&templates);
         if data.properties.forward_reference() {
-            return format!("{properties}{templates}{kind} {name}");
+            return format!("{properties}{templates_prefix}{kind} {type_name}");
         }
 
         let mut fields: Vec<String> = Vec::new();
@@ -809,19 +759,26 @@ impl<'a> DecompilationResult<'a> {
         }
 
         let mut fields = do_indent(&fields.join("\n"));
-        for (identifier, template) in templates_map {
+        for (_, identifier, template) in templates {
             fields = fields.replace(&template, &identifier);
             base_classes = base_classes.replace(&template, &identifier);
         }
 
-        format!("{properties}{templates}{kind} {name} {base_classes} {{\n{fields}\n}}")
+        format!("{properties}{templates_prefix}{kind} {type_name} {base_classes} {{\n{fields}\n}}")
     }
 
     fn drain_dependencies(&self, other: &Self) {
-        self.drain_dependencies_inner(&mut other.dependencies.borrow_mut(), &mut other.base_classes.borrow_mut());
+        self.drain_dependencies_inner(
+            &mut other.dependencies.borrow_mut(),
+            &mut other.base_classes.borrow_mut(),
+        );
     }
 
-    fn drain_dependencies_inner(&self, dependencies: &mut HashSet<String>, base_classes: &mut HashSet<String>) {
+    fn drain_dependencies_inner(
+        &self,
+        dependencies: &mut HashSet<String>,
+        base_classes: &mut HashSet<String>,
+    ) {
         self.base_classes.borrow_mut().extend(base_classes.drain());
         self.dependencies.borrow_mut().extend(dependencies.drain());
     }
@@ -874,16 +831,14 @@ impl<'a> DecompilationResult<'a> {
     }
 
     fn namespaced_repersentation(&self) -> String {
-        let name = self.raw_name();
-
-        let mut namespaces = list_namespaces_as_vec(name);
+        let mut namespaces = self.name.namespace_vec();
         let short_name = namespaces.pop().unwrap_or_default();
         let repersentation = &self.repersentation;
         if namespaces.is_empty() {
             return format!("{repersentation};");
         }
 
-        let data_structure = repersentation.replacen(name, &short_name, 1);
+        let data_structure = repersentation.replacen(self.name.name(), &short_name, 1);
 
         let mut namespaced_string = String::new();
         for namespace in &namespaces {
@@ -899,121 +854,6 @@ impl<'a> DecompilationResult<'a> {
         namespaced_string.push(';');
         namespaced_string
     }
-}
-
-/// We need to split template types by commas, however sometimes nested templates contain commas inside <>.
-/// This is a special implementation of the `split()` function to handle the above case.
-fn split_templates(templates: &str) -> Vec<String> {
-    let mut result = Vec::new();
-    let mut current = String::new();
-    let mut template_depth = 0;
-
-    let chars: Vec<char> = templates.chars().collect();
-
-    for char in chars {
-        match char {
-            '<' | '(' => {
-                template_depth += 1;
-                current.push(char);
-            }
-            '>' | ')' => {
-                template_depth -= 1;
-                if template_depth < 0 {
-                    template_depth = 0;
-                }
-                current.push(char);
-            }
-            ',' if template_depth == 0 => {
-                result.push(current);
-                current = String::with_capacity(32);
-            }
-            _ => {
-                current.push(char);
-            }
-        }
-    }
-
-    if !current.is_empty() {
-        result.push(current);
-    }
-
-    result
-}
-
-/// Figures out the template types based on the class name stored in the PDB.
-/// For example `my_namespace::MyClass<int, std::string>` would return:
-/// `("template <typename T, typename U> ", "MyClass", {"T": "int", "U": "std::string"})`
-fn parse_template_types(class_name: &str) -> (String, String, HashMap<String, String>) {
-    /// Converts a number into base 7 where each digit is a letter from T, U, V, W, X, Y, Z.
-    fn number_to_template_type_name(i: usize) -> String {
-        match i {
-            0 => "T".to_string(),
-            1 => "U".to_string(),
-            2 => "V".to_string(),
-            3 => "W".to_string(),
-            4 => "X".to_string(),
-            5 => "Y".to_string(),
-            6 => "Z".to_string(),
-            _ => {
-                let remainder = i % 7;
-                let i = i / 7;
-                let mut s = number_to_template_type_name(i);
-                s.push_str(&number_to_template_type_name(remainder));
-                s
-            }
-        }
-    }
-
-    let re = regex!(r"(.+?)<(.*)>");
-    let Some(captures) = re.captures(class_name) else {
-        return (String::new(), class_name.to_string(), HashMap::new());
-    };
-
-    let class_name_without_templates = captures
-        .get(1)
-        .expect("Static regex always has one group")
-        .as_str();
-
-    // This handles the special case of my_namespace::<unnamed-class-MyClass>
-    if class_name_without_templates.ends_with("::") {
-        return (String::new(), class_name.to_string(), HashMap::new());
-    }
-
-    let templates = captures
-        .get(2)
-        .expect("Static regex always has two groups")
-        .as_str();
-
-    if templates.is_empty() {
-        return (
-            String::new(),
-            class_name_without_templates.to_string(),
-            HashMap::new(),
-        );
-    }
-
-    let templates: Vec<String> = split_templates(templates);
-    let mut templates_string = "template <".to_string();
-    let mut templates_map: HashMap<String, String> = HashMap::new();
-
-    for (i, template) in templates.iter().enumerate() {
-        let identifier = number_to_template_type_name(i);
-
-        templates_string.push_str("typename ");
-        templates_string.push_str(&identifier);
-        templates_string.push(',');
-
-        templates_map.insert(identifier, template.to_owned());
-    }
-    templates_string.pop(); // remove the last comma
-    templates_string.push('>');
-    templates_string.push(' ');
-
-    (
-        templates_string,
-        class_name_without_templates.to_string(),
-        templates_map,
-    )
 }
 
 #[allow(non_camel_case_types)]
@@ -1153,7 +993,7 @@ impl<'a> NestedClassesAndUnions<'a> {
                 return Ok(());
             }
 
-            let name = replace_unnamed_types(
+            let name = Symbol::replace_unnamed_types(
                 &match &data {
                     pdb::TypeData::Class(data)
                         if data.properties.is_nested_type() && data.properties.sealed() =>
@@ -1183,8 +1023,8 @@ impl<'a> NestedClassesAndUnions<'a> {
         }
     }
 
-    fn find(&self, name: &str) -> Option<DecompilationResult<'_>> {
-        let data = self.by_data.get(name)?;
+    fn find(&self, name: &Symbol) -> Option<DecompilationResult<'_>> {
+        let data = self.by_data.get(name.name())?;
         Some(DecompilationResult::from_data(
             self,
             None,
@@ -1227,7 +1067,7 @@ fn decompile_forward_refrences<'a>(
 
         let dc = DecompilationResult::from_data(nested_classes, None, type_finder, data);
         let forward_refrence = dc.namespaced_repersentation();
-        let forward_refrence = parse_lambdas(&forward_refrence, lambda_names);
+        let forward_refrence = qualify_all_lambda_names(&forward_refrence, lambda_names);
 
         forward_refrences.insert(forward_refrence);
 
@@ -1241,7 +1081,7 @@ fn decompile_forward_refrences<'a>(
     forward_refrences
 }
 
-fn parse_lambdas(header_file: &str, lambda_names: &mut Vec<String>) -> String {
+fn qualify_all_lambda_names(header_file: &str, lambda_names: &mut Vec<String>) -> String {
     let header_file = regex!(r"<lambda_(\w+?)>")
         .replace_all(header_file, |lambda_name: &regex::Captures| {
             let lambda_name = lambda_name
@@ -1263,8 +1103,9 @@ fn is_std_namespace(data: &pdb::TypeData<'_>) -> bool {
     })
 }
 
-fn sort_with_dependencies(
+fn topological_sort(
     classes_and_unions: &HashMap<String, DecompilationResult>,
+    lambda_names: &mut Vec<String>,
 ) -> Result<Vec<String>> {
     let mut topo_sort = TopoSort::with_capacity(classes_and_unions.len());
     for dc in classes_and_unions.values() {
@@ -1274,14 +1115,33 @@ fn sort_with_dependencies(
             .filter(|d| classes_and_unions.contains_key(*d))
             .cloned()
             .collect();
-        //println!("{} depends on {dependencies:?}", dc.raw_name());
-        topo_sort.insert(dc.raw_name().to_string(), dependencies);
+        //println!("{} depends on {dependencies:?}", dc.name.raw_name());
+        topo_sort.insert(dc.name.name().to_string(), dependencies);
+        /*if topo_sort.try_vec_nodes().is_err() {
+            bail!(format!(
+                "Detected a dependency cycle in {}",
+                dc.name.raw_name()
+            ));
+        }*/
     }
 
-    match topo_sort.into_vec_nodes() {
-        SortResults::Full(nodes) => Ok(nodes),
-        SortResults::Partial(_) => bail!("Partial sort results"),
-    }
+    let sort_order = match topo_sort.into_vec_nodes() {
+        SortResults::Full(nodes) => nodes,
+        SortResults::Partial(_) => bail!("Detected a dependency cycle"),
+    };
+
+    let classes_and_unions: Vec<String> = sort_order
+        .into_iter()
+        .map(|name| {
+            let dc = classes_and_unions
+                .get(&name)
+                .unwrap_or_else(|| panic!("sort order will have all the names: {name}"));
+            let s = dc.namespaced_repersentation();
+            qualify_all_lambda_names(&s, lambda_names)
+        })
+        .collect();
+
+    Ok(classes_and_unions)
 }
 
 fn decompile_classes_unions_and_enums<'a>(
@@ -1338,10 +1198,10 @@ fn decompile_classes_unions_and_enums<'a>(
 
         if is_enum {
             let s = dc.namespaced_repersentation();
-            let s = parse_lambdas(&s, lambda_names);
-            enums.insert(dc.name, s);
+            let s = qualify_all_lambda_names(&s, lambda_names);
+            enums.insert(dc.name.name().to_string(), s);
         } else {
-            classes_and_unions.insert(dc.raw_name().to_string(), dc);
+            classes_and_unions.insert(dc.name.name().to_string(), dc);
         }
 
         Ok(())
@@ -1351,18 +1211,8 @@ fn decompile_classes_unions_and_enums<'a>(
     let mut enums: Vec<String> = enums.into_iter().collect();
     enums.sort();
 
-    let sort_order =
-        sort_with_dependencies(&classes_and_unions).unwrap_or_else(|_| vec!["err!".to_string()]);
-    let mut classes_and_unions: Vec<String> = sort_order
-        .into_iter()
-        .map(|name| {
-            let dc = classes_and_unions
-                .get(&name)
-                .expect("sort order will have all the names");
-            let s = dc.namespaced_repersentation();
-            parse_lambdas(&s, lambda_names)
-        })
-        .collect();
+    let mut classes_and_unions =
+        topological_sort(&classes_and_unions, lambda_names).expect("Detected a dependency cycle");
 
     let mut classes_unions_and_enums = enums;
     classes_unions_and_enums.append(&mut classes_and_unions);
@@ -1378,18 +1228,6 @@ fn replace_pointers_to_errors(s: &str) -> String {
             let kind = captures.get(2).expect("Compiled regex will always have a capture group").as_str();
             format!("/* error processing type index 0x{type_index} Support for types of kind 0x{kind} is not implemented*/;")
         }).into_owned()
-}
-
-fn replace_unnamed_types(s: &str) -> String {
-    regex!(r"<unnamed-(type|enum)-(.+?)>")
-        .replace_all(s, |captures: &regex::Captures| {
-            captures
-                .get(2)
-                .expect("Compiled regex will always have a capture group")
-                .as_str()
-                .to_owned()
-        })
-        .into_owned()
 }
 
 pub fn generate(pdb_path: &Path) -> Result<()> {
@@ -1458,7 +1296,6 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
         format!("lambda_{i}")
     }).into_owned();
 
-    header_file = replace_unnamed_types(&header_file);
     header_file = replace_pointers_to_errors(&header_file);
 
     println!(
