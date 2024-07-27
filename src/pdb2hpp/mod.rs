@@ -2,6 +2,7 @@ mod symbol;
 
 use anyhow::{bail, Result};
 use core::panic;
+use std::time::Instant;
 use lazy_regex::regex;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -490,8 +491,7 @@ impl<'a> DecompilationResult<'a> {
                     return;
                 }
 
-                let type_name = data.name.to_string().into_owned();
-                let type_name = Symbol::new(type_name);
+                let type_name = Symbol::new(data.name.to_string().into_owned());
                 let templates: Vec<(String, String, String)> = type_name.templates_by_type();
 
                 let properties = stringify_properties(data.properties);
@@ -533,7 +533,7 @@ impl<'a> DecompilationResult<'a> {
             Some(pdb::TypeData::Enumeration(data)) => {
                 // An enum type in c++
                 // TODO handle data.properties
-                let mut type_name = data.name.to_string().into_owned();
+                let type_name = Symbol::new(data.name.to_string().into_owned());
 
                 if data.properties.forward_reference() {
                     self.repersentation = format!("enum {type_name}");
@@ -555,15 +555,16 @@ impl<'a> DecompilationResult<'a> {
                 );
                 let underlying_type = underlying_dc.repersentation;
 
+                let mut type_name_str = type_name.to_string();
                 if data.properties.is_nested_type() {
-                    type_name = type_name
+                    type_name_str = type_name_str
                         .split("::")
                         .last()
-                        .unwrap_or(&type_name)
+                        .unwrap_or(&type_name_str)
                         .to_string();
                 }
                 format!(
-                    "{}enum class {type_name} : {underlying_type} {{\n{fields}\n}};",
+                    "{}enum class {type_name_str} : {underlying_type} {{\n{fields}\n}}",
                     stringify_properties(data.properties),
                 )
             }
@@ -700,7 +701,7 @@ impl<'a> DecompilationResult<'a> {
                         type_finder,
                         arg_type,
                     );
-                    args.push_str(dc.name.name());
+                    args.push_str(dc.name.as_str());
                     args.push(' ');
                     args.push_str(&number_to_method_arg_name(i));
                     args.push_str(&dc.name_suffix);
@@ -838,7 +839,7 @@ impl<'a> DecompilationResult<'a> {
             return format!("{repersentation};");
         }
 
-        let data_structure = repersentation.replacen(self.name.name(), &short_name, 1);
+        let data_structure = repersentation.replacen(self.name.as_str(), &short_name, 1);
 
         let mut namespaced_string = String::new();
         for namespace in &namespaces {
@@ -1024,7 +1025,7 @@ impl<'a> NestedClassesAndUnions<'a> {
     }
 
     fn find(&self, name: &Symbol) -> Option<DecompilationResult<'_>> {
-        let data = self.by_data.get(name.name())?;
+        let data = self.by_data.get(name.as_str())?;
         Some(DecompilationResult::from_data(
             self,
             None,
@@ -1099,7 +1100,7 @@ fn qualify_all_lambda_names(header_file: &str, lambda_names: &mut Vec<String>) -
 fn is_std_namespace(data: &pdb::TypeData<'_>) -> bool {
     data.name().map_or(true, |name| {
         let name = name.to_string();
-        name.starts_with("std::") || name.starts_with("MplVector<") || name.starts_with("Signal<")
+        name.starts_with("std::") || name.starts_with("MplVector<") || name.starts_with("Signal<") || name.starts_with("ATL::") || name.starts_with("Microsoft::") || name.starts_with("Concurrency::")
     })
 }
 
@@ -1116,7 +1117,7 @@ fn topological_sort(
             .cloned()
             .collect();
         //println!("{} depends on {dependencies:?}", dc.name.raw_name());
-        topo_sort.insert(dc.name.name().to_string(), dependencies);
+        topo_sort.insert(dc.name.as_str().to_string(), dependencies);
         /*if topo_sort.try_vec_nodes().is_err() {
             bail!(format!(
                 "Detected a dependency cycle in {}",
@@ -1199,9 +1200,9 @@ fn decompile_classes_unions_and_enums<'a>(
         if is_enum {
             let s = dc.namespaced_repersentation();
             let s = qualify_all_lambda_names(&s, lambda_names);
-            enums.insert(dc.name.name().to_string(), s);
+            enums.insert(dc.name.as_str().to_string(), s);
         } else {
-            classes_and_unions.insert(dc.name.name().to_string(), dc);
+            classes_and_unions.insert(dc.name.as_str().to_string(), dc);
         }
 
         Ok(())
@@ -1233,6 +1234,8 @@ fn replace_pointers_to_errors(s: &str) -> String {
 pub fn generate(pdb_path: &Path) -> Result<()> {
     let pdb = File::open(pdb_path)?;
     let mut pdb = pdb::PDB::open(pdb)?;
+
+    let start_time = Instant::now();
 
     let type_information = pdb.type_information()?;
     let mut type_finder = type_information.finder();
@@ -1304,7 +1307,9 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
     );
     let mut hpp = File::create("./src/structs.hpp")?;
     hpp.write_all(header_file.as_bytes())?;
-    println!("Structs.hpp creation succeeded.");
+    
+    let elapsed = start_time.elapsed();
+    println!("Structs.hpp creation succeeded. Total time: {}s", elapsed.as_secs_f64());
 
     println!("Using bindgen to generate structs.rs");
     let bindings = bindgen::Builder::default()

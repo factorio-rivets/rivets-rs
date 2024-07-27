@@ -17,14 +17,13 @@ enum Type {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Symbol {
     name: Type,
-    unlambdad: String,
     pointer_count: Cell<usize>,
     modifiers: RefCell<String>,
 }
 
 impl Display for Symbol {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.unlambdad)
+        write!(f, "{}", self.as_str())
     }
 }
 
@@ -32,30 +31,26 @@ const NONETYPE_ERROR: &str = "/* error: attempt to display invalid type */";
 
 // This impl block contains all the `static` functions on the Symbol class.
 impl Symbol {
-    fn _new(name: Type, unlambdad: &str) -> Self {
-        let unlambdad: &str = unlambdad
-            .find('<')
-            .map_or_else(|| unlambdad, |i| &unlambdad[..i]);
-
+    const fn _new(name: Type) -> Self {
         Self {
             name,
-            unlambdad: unlambdad.to_string(),
             pointer_count: Cell::new(0),
             modifiers: RefCell::new(String::new()),
         }
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     pub fn new(name: String) -> Self {
         let unlambdad = Self::replace_unnamed_types(&name);
-        Self::_new(Type::Symbol(name), &unlambdad)
+        Self::_new(Type::Symbol(unlambdad))
     }
 
-    pub fn from_string(name: String) -> Self {
-        Self::_new(Type::String(name.to_string()), &name)
+    pub const fn from_string(name: String) -> Self {
+        Self::_new(Type::String(name))
     }
 
-    pub fn none() -> Self {
-        Self::_new(Type::None, NONETYPE_ERROR)
+    pub const fn none() -> Self {
+        Self::_new(Type::None)
     }
 
     pub fn replace_unnamed_types(name: &str) -> String {
@@ -73,10 +68,12 @@ impl Symbol {
 
 // This impl block contains all the instance functions on the Symbol class.
 impl Symbol {
-    /// This returns the raw name as it appears in the PDB file with one diffrence:
-    /// Unnamed/"lambda" types such as `<unnamed-type-MyClass>` are replaced with `MyClass`.
-    pub fn name(&self) -> &str {
-        &self.unlambdad
+    pub fn as_str(&self) -> &str {
+        match &self.name {
+            Type::Symbol(s) => s.find('<').map_or_else(|| s.as_str(), |i| &s[..i]),
+            Type::String(s) => s,
+            Type::None => NONETYPE_ERROR,
+        }
     }
 
     pub fn increment_pointer_count(&self) {
@@ -89,8 +86,7 @@ impl Symbol {
 
     pub fn fully_qualifed(&self) -> String {
         match &self.name {
-            Type::Symbol(_) => {
-                let s = &self.unlambdad;
+            Type::Symbol(s) => {
                 let pointers = self.pointer_count.get();
                 let pointers = "*".repeat(pointers);
                 let modifiers = &self.modifiers.borrow();
@@ -103,7 +99,7 @@ impl Symbol {
     }
 
     pub fn namespace_vec(&self) -> Vec<String> {
-        let s = self.name();
+        let s = self.as_str();
 
         let mut result = Vec::new();
         let mut current = String::new();
@@ -147,13 +143,35 @@ impl Symbol {
     /// We need to split template types by commas, however sometimes nested templates contain commas inside <>.
     /// This is a special implementation of the `split()` function to handle the above case.
     fn templates_vec(&self) -> Vec<String> {
-        let s = self.name();
+        let Type::Symbol(type_name) = &self.name else {
+            return Vec::new();
+        };
+
+        let re = regex!(r"(.+?)<(.*)>");
+        let Some(captures) = re.captures(type_name) else {
+            return Vec::new();
+        };
+
+        let class_name_without_templates = captures
+            .get(1)
+            .expect("Static regex always has one group")
+            .as_str();
+
+        // This handles the special case of my_namespace::<unnamed-class-MyClass>
+        if class_name_without_templates.ends_with("::") {
+            return Vec::new();
+        }
+
+        let templates = captures
+            .get(2)
+            .expect("Static regex always has two groups")
+            .as_str();
 
         let mut result = Vec::new();
         let mut current = String::new();
         let mut template_depth = 0;
 
-        let chars: Vec<char> = s.chars().collect();
+        let chars: Vec<char> = templates.chars().collect();
 
         for char in chars {
             match char {
