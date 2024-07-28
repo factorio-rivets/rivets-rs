@@ -1,6 +1,7 @@
 use anyhow::{bail, Result};
 use pdb::{FallibleIterator, PDB};
 use retour::static_detour;
+use windows::Win32::System::Threading::CREATE_SUSPENDED;
 use std::ffi::{c_char, CString};
 use std::net::TcpStream;
 use std::path::Path;
@@ -9,6 +10,13 @@ use std::{collections::HashMap, ffi::c_int, fs::File, mem};
 use tracing::{error, info};
 use traits::{factorio_path, AsPcstr};
 use windows::Win32::System::LibraryLoader::GetModuleHandleA;
+use std::io;
+use std::net::TcpListener;
+use windows::core::{s, w, PCSTR, PSTR};
+use windows::Win32::Foundation::CloseHandle;
+use windows::Win32::System::Threading::{
+    CreateProcessA, ResumeThread, PROCESS_INFORMATION, STARTUPINFOA,
+};
 
 mod traits;
 
@@ -77,8 +85,47 @@ static_detour! {
 
 type FnMain = unsafe extern "C" fn(c_int, *const c_char, *const c_char) -> bool;
 
+fn start_factorio(factorio_path: PCSTR) -> Result<PROCESS_INFORMATION> {
+    let mut startup_info: STARTUPINFOA = unsafe { std::mem::zeroed() };
+    startup_info.cb = std::mem::size_of::<STARTUPINFOA>().try_into()?;
+    let mut factorio_process_information: PROCESS_INFORMATION = unsafe { std::mem::zeroed() };
+
+    let process_result = unsafe {
+        CreateProcessA(
+            factorio_path,
+            PSTR::null(),
+            None,
+            None,
+            false,
+            CREATE_SUSPENDED,
+            None,
+            PCSTR::null(),
+            &startup_info,
+            &mut factorio_process_information,
+        )
+    };
+
+    if let Err(err) = process_result {
+        bail!("Failed to create Factorio process: {err}");
+    }
+
+    let process_handle = factorio_process_information.hProcess;
+
+    unsafe {
+        ResumeThread(factorio_process_information.hThread);
+        CloseHandle(factorio_process_information.hThread).ok();
+        CloseHandle(process_handle).ok();
+    }
+
+    Ok(factorio_process_information)
+}
+
 fn main_detour(_argc: c_int, _argv: *const c_char, _envp: *const c_char) -> bool {
-    info!("Detoured into main!");
+    info!("Detoured into LuaSurface.valid()!");
+    let notepad_path = s!(r"C:/Program Files/WindowsApps/Microsoft.WindowsNotepad_11.2405.13.0_x64__8wekyb3d8bbwe/Notepad/Notepad.exe");
+
+    start_factorio(notepad_path).unwrap();
+
     //unsafe { MessageBoxWHook.call(hwnd, text, replaced_caption, msgbox_style) }
     false
 }
