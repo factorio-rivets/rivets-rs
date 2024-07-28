@@ -5,7 +5,6 @@ edition = "2021"
 
 [dependencies]
 retour = { version = "0.3", features = ["static-detour"] }
-retour-utils = "0.2.1"
 ctor = "0.2.8"
 ntapi = "0.4.1"
 dll-syringe = "0.15.2"
@@ -27,6 +26,8 @@ indicatif = "0.17.8"
 regex = "1.10.5"
 lazy-regex = "3.1.0"
 topo_sort = "0.4.0"
+rivets-macros = { path = "../rivets/rivets-macros" }
+libloading = "0.8.5"
 
 [lints.clippy]
 nursery = { level = "warn", priority = -1 }

@@ -1,11 +1,12 @@
 use anyhow::{bail, Result};
+use libloading::{Library, Symbol};
 use pdb::{FallibleIterator, PDB};
 use retour::static_detour;
-use std::ffi::{c_char, CString};
+use std::ffi::CString;
 use std::net::TcpStream;
 use std::path::Path;
 use std::sync::Mutex;
-use std::{collections::HashMap, ffi::c_int, fs::File, mem};
+use std::{collections::HashMap, fs::File};
 use tracing::{error, info};
 use traits::{factorio_path, AsPcstr};
 use windows::Win32::System::LibraryLoader::GetModuleHandleA;
@@ -71,38 +72,7 @@ unsafe fn get_dll_base_address(module_name: &str) -> Result<u64> {
     }
 }
 
-static_detour! {
-    static MainHook: unsafe extern "C" fn(c_int, *const c_char, *const c_char) -> bool;
-}
-
-type FnMain = unsafe extern "C" fn(c_int, *const c_char, *const c_char) -> bool;
-
-fn main_detour(_argc: c_int, _argv: *const c_char, _envp: *const c_char) -> bool {
-    info!("Detoured into main!");
-    //unsafe { MessageBoxWHook.call(hwnd, text, replaced_caption, msgbox_style) }
-    false
-}
-
-unsafe fn hook(pdb_cache: &PDBCache, function_name: &str) -> Result<()> {
-    let Some(address) = pdb_cache.get_function_address(function_name) else {
-        bail!("Failed to find main address");
-    };
-
-    info!("{} address: {:#x}", function_name, address);
-    let target: FnMain = mem::transmute(address);
-    MainHook.initialize(target, main_detour)?.enable()?;
-    Ok(())
-}
-
-fn inject() -> Result<()> {
-    let pdb_path = factorio_path("factorio.pdb")?;
-    let cache = PDBCache::new(&pdb_path, "factorio.exe")?;
-
-    let function_name = "?valid@LuaSurface@@UEBA_NXZ";
-    unsafe { hook(&cache, function_name) }
-}
-
-fn start_steam() {
+fn start_stream() {
     let ip = "127.0.0.1:40267";
     let stream = TcpStream::connect(ip).unwrap_or_else(|_| {
         panic!("Could not establish stdout connection to rivets. Port {ip} is busy.")
@@ -112,9 +82,47 @@ fn start_steam() {
         .init();
 }
 
+fn inject() -> Result<()> {
+    let pdb_path = factorio_path("factorio.pdb")?;
+    let pdb_cache = PDBCache::new(&pdb_path, "factorio.exe")?;
+
+    let dll_paths = [
+        r"C:/Users/zacha/Documents/factorio/mods/achievement-enabler/target/debug/achievement_enabler.dll",
+    ];
+    for path in dll_paths {
+        let lib = unsafe { Library::new(path)? };
+        let mangled_name = unsafe {
+            let func: Symbol<extern "C" fn() -> String> = lib.get(b"mangled_name")?;
+            func()
+        };
+        let Some(address) = pdb_cache.get_function_address(&mangled_name) else {
+            bail!("Failed to find main address");
+        };
+        info!("{mangled_name} address: {:#x}", address);
+
+        static_detour! {
+            static Hook: unsafe extern "C" fn() -> bool;
+        }
+
+        type Signature = unsafe extern "C" fn() -> bool;
+
+        let main_detour = unsafe {
+            let func: Symbol<fn() -> Signature> = lib.get(b"main_detour")?;
+            func()
+        };
+        info!("jjjjjjjjjjjjjj {}", unsafe{ main_detour()});
+
+        unsafe {
+            let target: Signature = std::mem::transmute(address);
+            Hook.initialize(target, move || {info!("jjj");let q =unsafe {main_detour()};info!("{q}");q})?.enable()?;
+        }
+    }
+    Ok(())
+}
+
 #[ctor::ctor]
 fn ctor() {
-    start_steam();
+    start_stream();
 
     if let Err(e) = inject() {
         error!("{e}");

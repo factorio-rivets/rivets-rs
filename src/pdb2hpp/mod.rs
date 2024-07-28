@@ -2,13 +2,13 @@ mod symbol;
 
 use anyhow::{bail, Result};
 use core::panic;
-use std::time::Instant;
 use lazy_regex::regex;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
+use std::time::Instant;
 use symbol::Symbol;
 use topo_sort::{SortResults, TopoSort};
 
@@ -1100,7 +1100,12 @@ fn qualify_all_lambda_names(header_file: &str, lambda_names: &mut Vec<String>) -
 fn is_std_namespace(data: &pdb::TypeData<'_>) -> bool {
     data.name().map_or(true, |name| {
         let name = name.to_string();
-        name.starts_with("std::") || name.starts_with("MplVector<") || name.starts_with("Signal<") || name.starts_with("ATL::") || name.starts_with("Microsoft::") || name.starts_with("Concurrency::")
+        name.starts_with("std::")
+            || name.starts_with("MplVector<")
+            || name.starts_with("Signal<")
+            || name.starts_with("ATL::")
+            || name.starts_with("Microsoft::")
+            || name.starts_with("Concurrency::")
     })
 }
 
@@ -1307,9 +1312,12 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
     );
     let mut hpp = File::create("./src/structs.hpp")?;
     hpp.write_all(header_file.as_bytes())?;
-    
+
     let elapsed = start_time.elapsed();
-    println!("Structs.hpp creation succeeded. Total time: {}s", elapsed.as_secs_f64());
+    println!(
+        "Structs.hpp creation succeeded. Total time: {}s",
+        elapsed.as_secs_f64()
+    );
 
     println!("Using bindgen to generate structs.rs");
     let bindings = bindgen::Builder::default()
