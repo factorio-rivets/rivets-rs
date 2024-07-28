@@ -5,7 +5,6 @@ edition = "2021"
 
 [dependencies]
 retour = { version = "0.3", features = ["static-detour"] }
-ctor = "0.2.8"
 ntapi = "0.4.1"
 dll-syringe = "0.15.2"
 tracing = "0.1.40"
@@ -37,8 +36,8 @@ expect_used = "allow"
 trivial_regex = "allow"
 
 [lib]
-name = "examplemod"
-crate-type = ["cdylib"]
+name = "rivets"
+crate-type = ["lib"]
 path = "src/lib.rs"
 
 [[bin]]

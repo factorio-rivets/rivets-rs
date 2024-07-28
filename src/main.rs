@@ -58,7 +58,7 @@ fn start_factorio(factorio_path: PCSTR) -> Result<PROCESS_INFORMATION> {
 }
 
 fn inject() -> Result<()> {
-    let dll_path = Path::new("./target/debug/examplemod.dll");
+    let dll_path = Path::new("./target/debug/achievement_enabler.dll");
 
     let listener = TcpListener::bind("127.0.0.1:40267");
     let listener = listener.map_err(|e| {

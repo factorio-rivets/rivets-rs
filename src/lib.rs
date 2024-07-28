@@ -1,13 +1,11 @@
 use anyhow::{bail, Result};
-use libloading::{Library, Symbol};
 use pdb::{FallibleIterator, PDB};
-use retour::static_detour;
 use std::ffi::CString;
 use std::net::TcpStream;
 use std::path::Path;
 use std::sync::Mutex;
 use std::{collections::HashMap, fs::File};
-use tracing::{error, info};
+use tracing::info;
 use traits::{factorio_path, AsPcstr};
 use windows::Win32::System::LibraryLoader::GetModuleHandleA;
 
@@ -72,7 +70,19 @@ unsafe fn get_dll_base_address(module_name: &str) -> Result<u64> {
     }
 }
 
-fn start_stream() {
+pub fn inject(function_name: &str, hook: unsafe fn(u64) -> Result<()>) -> Result<()> {
+    let pdb_path = factorio_path("factorio.pdb")?;
+    let pdb_cache = PDBCache::new(&pdb_path, "factorio.exe")?;
+
+    let Some(address) = pdb_cache.get_function_address(function_name) else {
+        bail!("Failed to find main address");
+    };
+    info!("{} address: {:#x}", function_name, address);
+
+    unsafe { hook(address) }
+}
+
+pub fn start_stream() {
     let ip = "127.0.0.1:40267";
     let stream = TcpStream::connect(ip).unwrap_or_else(|_| {
         panic!("Could not establish stdout connection to rivets. Port {ip} is busy.")
@@ -80,51 +90,4 @@ fn start_stream() {
     tracing_subscriber::fmt::fmt()
         .with_writer(Mutex::new(stream))
         .init();
-}
-
-fn inject() -> Result<()> {
-    let pdb_path = factorio_path("factorio.pdb")?;
-    let pdb_cache = PDBCache::new(&pdb_path, "factorio.exe")?;
-
-    let dll_paths = [
-        r"C:/Users/zacha/Documents/factorio/mods/achievement-enabler/target/debug/achievement_enabler.dll",
-    ];
-    for path in dll_paths {
-        let lib = unsafe { Library::new(path)? };
-        let mangled_name = unsafe {
-            let func: Symbol<extern "C" fn() -> String> = lib.get(b"mangled_name")?;
-            func()
-        };
-        let Some(address) = pdb_cache.get_function_address(&mangled_name) else {
-            bail!("Failed to find main address");
-        };
-        info!("{mangled_name} address: {:#x}", address);
-
-        static_detour! {
-            static Hook: unsafe extern "C" fn() -> bool;
-        }
-
-        type Signature = unsafe extern "C" fn() -> bool;
-
-        let main_detour = unsafe {
-            let func: Symbol<fn() -> Signature> = lib.get(b"main_detour")?;
-            func()
-        };
-        info!("jjjjjjjjjjjjjj {}", unsafe{ main_detour()});
-
-        unsafe {
-            let target: Signature = std::mem::transmute(address);
-            Hook.initialize(target, move || {info!("jjj");let q =unsafe {main_detour()};info!("{q}");q})?.enable()?;
-        }
-    }
-    Ok(())
-}
-
-#[ctor::ctor]
-fn ctor() {
-    start_stream();
-
-    if let Err(e) = inject() {
-        error!("{e}");
-    }
 }
