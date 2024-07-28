@@ -11,6 +11,9 @@ use windows::Win32::System::LibraryLoader::GetModuleHandleA;
 
 mod traits;
 
+extern crate rivets_macros;
+pub use rivets_macros::detour;
+
 struct PDBCache {
     pdb: PDB<'static, File>,
     symbol_addresses: HashMap<String, u32>,
