@@ -1310,7 +1310,7 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
         "Writing to structs.hpp. File size: {} bytes.",
         header_file.len()
     );
-    let mut hpp = File::create("./src/structs.hpp")?;
+    let mut hpp = File::create("./rivets/src/structs.hpp")?;
     hpp.write_all(header_file.as_bytes())?;
 
     let elapsed = start_time.elapsed();
