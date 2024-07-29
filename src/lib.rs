@@ -57,7 +57,7 @@ impl PDBCache {
         Ok(())
     }
 
-    pub fn get_function_address(&self, function_name: &str) -> Option<u64> {
+    fn get_function_address(&self, function_name: &str) -> Option<u64> {
         self.symbol_addresses
             .get(function_name)
             .copied()
@@ -78,7 +78,7 @@ pub fn inject(function_name: &str, hook: unsafe fn(u64) -> Result<()>) -> Result
     let pdb_cache = PDBCache::new(&pdb_path, "factorio.exe")?;
 
     let Some(address) = pdb_cache.get_function_address(function_name) else {
-        bail!("Failed to find main address");
+        bail!("Failed to find {function_name} address");
     };
     info!("{} address: {:#x}", function_name, address);
 
