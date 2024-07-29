@@ -1,4 +1,5 @@
 use anyhow::{anyhow, bail, Result};
+use dll_syringe::process::{BorrowedProcess, ProcessModule};
 use dll_syringe::{process::OwnedProcess, Syringe};
 use std::ffi::CString;
 use std::io;
@@ -15,19 +16,23 @@ mod luastate;
 mod pdb2hpp;
 mod traits;
 
-fn inject_dll(dll_name: &Path) -> Result<()> {
-    println!("Injecting DLL into Factorio process...");
+fn get_syringe() -> Result<Syringe> {
     let Some(process) = OwnedProcess::find_first_by_name("factorio") else {
         bail!("Factorio process not found.");
     };
 
-    let syringe = Syringe::for_process(process);
-    let option = syringe.inject(dll_name);
+    Ok(Syringe::for_process(process))
+}
 
-    match option {
-        Ok(_) => Ok(()),
-        Err(e) => bail!("Failed to inject DLL: {e}"),
-    }
+fn inject_dll<'a>(
+    syringe: &'a Syringe,
+    dll_name: &Path,
+) -> Result<ProcessModule<BorrowedProcess<'a>>> {
+    println!("Injecting DLL into Factorio process...");
+
+    syringe
+        .inject(dll_name)
+        .map_err(|e| anyhow!("Failed to inject DLL: {e}"))
 }
 
 fn start_factorio(factorio_path: PCSTR) -> Result<PROCESS_INFORMATION> {
@@ -76,7 +81,8 @@ fn inject() -> Result<()> {
         start_factorio(factorio_path.as_pcstr())?;
     let process_handle = factorio_process_information.hProcess;
 
-    inject_dll(dll_path)?;
+    let syringe = get_syringe()?;
+    inject_dll(&syringe, dll_path)?;
     println!("DLL injected successfully.");
 
     unsafe {
