@@ -1,6 +1,7 @@
 use anyhow::{bail, Result};
 use cpp_demangle::Symbol;
 use dirs::home_dir;
+use lazy_regex::regex;
 use pdb::{FallibleIterator, PDB};
 use std::ffi::CString;
 use std::net::TcpStream;
@@ -127,4 +128,20 @@ pub fn demangle(mangled: &str) -> Option<String> {
         },
         |sym| Some(sym.to_string()),
     )
+}
+
+/// Takes an unmangled C++ MSVC symbol name and returns the calling convention.
+/// Fails if the calling convention is not one of cdecl, stdcall, fastcall, thiscall, or vectorcall.
+#[must_use]
+pub fn get_calling_convention(unmangled_name: &str) -> Option<syn::Abi> {
+    let abi = regex!(r" __[a-zA-Z]+ ").find(unmangled_name)?.as_str();
+
+    Some(match abi {
+        " __cdecl " => syn::parse_quote! { extern "C" },
+        " __stdcall " => syn::parse_quote! { extern "stdcall" },
+        " __fastcall " => syn::parse_quote! { extern "fastcall" },
+        " __thiscall " => syn::parse_quote! { extern "thiscall" },
+        " __vectorcall " => syn::parse_quote! { extern "vectorcall" },
+        _ => return None,
+    })
 }

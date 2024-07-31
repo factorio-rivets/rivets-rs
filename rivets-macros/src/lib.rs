@@ -1,8 +1,28 @@
 #![feature(proc_macro_diagnostic)]
 
+use anyhow::{bail, Result};
 use proc_macro::{Diagnostic, Level, Span, TokenStream};
 use quote::quote;
-use syn::{parse_macro_input, FnArg, ItemFn};
+use syn::{parse_macro_input, Abi, FnArg, ItemFn};
+
+fn failure(callback: proc_macro2::TokenStream, error_message: &str) -> TokenStream {
+    Diagnostic::spanned(Span::call_site(), Level::Error, error_message).emit();
+    callback.into()
+}
+
+fn determine_calling_convention(input: &ItemFn, unmangled_name: &str) -> Result<Abi> {
+    if let Some(abi) = &input.sig.abi {
+        let abi = quote! { #abi };
+        bail!("Detour functions cannot specify an ABI. The ABI is automatically specified by rivets. You specifed: {abi}");
+    } else {
+        let abi = rivets_shared::get_calling_convention(unmangled_name);
+        if let Some(abi) = abi {
+            Ok(abi)
+        } else {
+            bail!("Failed to determine calling convention for {unmangled_name}. Please report this issue to the rivets developers.");
+        }
+    }
+}
 
 #[proc_macro_attribute]
 pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -32,15 +52,13 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
         .collect();
     let arguments = quote! { #( #arguments ),* };
 
-    if let Some(abi) = input.sig.abi {
-        let abi = quote! { #abi };
-        let error_message = format!("Detour functions cannot specify an ABI. The ABI is automatically specified by rivets. You specifed: {abi}");
-        Diagnostic::spanned(Span::call_site(), Level::Error, error_message).emit();
-        return callback.into();
-    }
+    let calling_convention = match determine_calling_convention(&input, &unmangled_name) {
+        Ok(abi) => abi,
+        Err(e) => return failure(callback, &e.to_string()),
+    };
 
     let cpp_function_header = quote! {
-        unsafe extern "C" fn(#arguments) #return_type
+        unsafe #calling_convention fn(#arguments) #return_type
     };
 
     let result = quote! {
@@ -65,7 +83,7 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         }
     };
-        
+
     Diagnostic::spanned(Span::call_site(), Level::Note, unmangled_name.clone()).emit();
 
     result.into()
