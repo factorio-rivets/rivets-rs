@@ -1,10 +1,16 @@
-use proc_macro::TokenStream;
+#![feature(proc_macro_diagnostic)]
+
+use proc_macro::{Diagnostic, Level, Span, TokenStream};
 use quote::quote;
 use syn::{parse_macro_input, FnArg, ItemFn};
 
 #[proc_macro_attribute]
 pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mangled_name = attr.to_string();
+    let unmangled_name =
+        rivets_shared::demangle(&mangled_name).unwrap_or_else(|| mangled_name.clone());
+        
+    Diagnostic::spanned(Span::call_site(), Level::Note, unmangled_name.clone()).emit();
 
     let input = parse_macro_input!(item as ItemFn);
     let name = &input.sig.ident;
@@ -34,6 +40,7 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
     let callback = quote! { #input };
 
     quote! {
+        #[doc = #unmangled_name]
         #callback
 
         unsafe fn hook(address: u64) -> anyhow::Result<()> {

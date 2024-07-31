@@ -1,11 +1,11 @@
 use anyhow::{anyhow, bail, Result};
 use dll_syringe::process::{BorrowedProcess, ProcessModule};
 use dll_syringe::{process::OwnedProcess, Syringe};
+use rivets_shared::{factorio_path, AsPcstr};
 use std::ffi::CString;
 use std::io;
 use std::net::TcpListener;
 use std::path::Path;
-use traits::{factorio_path, AsPcstr};
 use windows::core::{PCSTR, PSTR};
 use windows::Win32::Foundation::CloseHandle;
 use windows::Win32::System::Threading::{
@@ -14,7 +14,6 @@ use windows::Win32::System::Threading::{
 
 mod luastate;
 mod pdb2hpp;
-mod traits;
 
 fn get_syringe() -> Result<Syringe> {
     let Some(process) = OwnedProcess::find_first_by_name("factorio") else {
