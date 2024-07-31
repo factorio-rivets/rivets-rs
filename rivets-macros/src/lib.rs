@@ -9,10 +9,9 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mangled_name = attr.to_string();
     let unmangled_name =
         rivets_shared::demangle(&mangled_name).unwrap_or_else(|| mangled_name.clone());
-        
-    Diagnostic::spanned(Span::call_site(), Level::Note, unmangled_name.clone()).emit();
 
     let input = parse_macro_input!(item as ItemFn);
+    let callback = quote! { #input };
     let name = &input.sig.ident;
     let return_type = &input.sig.output;
 
@@ -33,13 +32,18 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
         .collect();
     let arguments = quote! { #( #arguments ),* };
 
+    if let Some(abi) = input.sig.abi {
+        let abi = quote! { #abi };
+        let error_message = format!("Detour functions cannot specify an ABI. The ABI is automatically specified by rivets. You specifed: {abi}");
+        Diagnostic::spanned(Span::call_site(), Level::Error, error_message).emit();
+        return callback.into();
+    }
+
     let cpp_function_header = quote! {
         unsafe extern "C" fn(#arguments) #return_type
     };
 
-    let callback = quote! { #input };
-
-    quote! {
+    let result = quote! {
         #[doc = #unmangled_name]
         #callback
 
@@ -60,6 +64,9 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
                 tracing::error!("{e}");
             }
         }
-    }
-    .into()
+    };
+        
+    Diagnostic::spanned(Span::call_site(), Level::Note, unmangled_name.clone()).emit();
+
+    result.into()
 }
