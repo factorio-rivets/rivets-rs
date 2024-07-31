@@ -14,7 +14,7 @@ windows = { version = "0.58.0", features = [
     "Win32_System",
     "Win32_System_LibraryLoader",
     "Win32_System_Threading",
-    "Win32_Security",
+    "Win32_Security"
 ] }
 pdb = "0.8.0"
 anyhow = "1.0.86"
@@ -27,6 +27,8 @@ lazy-regex = "3.1.0"
 topo_sort = "0.4.0"
 rivets-macros = { path = "../rivets/rivets-macros" }
 libloading = "0.8.5"
+cpp_demangle = "0.4.3"
+undname = "1.1.2"
 
 [lints.clippy]
 nursery = { level = "warn", priority = -1 }

@@ -1,4 +1,5 @@
 use anyhow::{bail, Result};
+use cpp_demangle::Symbol;
 use pdb::{FallibleIterator, PDB};
 use std::ffi::CString;
 use std::net::TcpStream;
@@ -7,6 +8,7 @@ use std::sync::Mutex;
 use std::{collections::HashMap, fs::File};
 use tracing::info;
 use traits::{factorio_path, AsPcstr};
+use undname::Flags;
 use windows::Win32::System::LibraryLoader::GetModuleHandleA;
 
 mod traits;
@@ -71,6 +73,19 @@ unsafe fn get_dll_base_address(module_name: &str) -> Result<u64> {
         Ok(handle) => Ok(handle.0 as u64),
         Err(err) => bail!(err),
     }
+}
+
+/// Attempts to demangle a mangled C++ symbol name. First tries Itanium demangling, then falls back to MSVC.
+#[must_use]
+pub fn demangle(mangled: &str) -> Option<String> {
+    Symbol::new(mangled).map_or_else(
+        |_| {
+            undname::demangle(b"?world@@YA?AUhello@@XZ".into(), Flags::NO_ACCESS_SPECIFIER)
+                .ok()
+                .map(|x| x.to_string())
+        },
+        |sym| Some(sym.to_string()),
+    )
 }
 
 pub fn inject(function_name: &str, hook: unsafe fn(u64) -> Result<()>) -> Result<()> {
