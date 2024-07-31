@@ -9,6 +9,7 @@ quote = "1.0.36"
 proc-macro2 = "1.0.86"
 rivets-shared = { path = "../rivets-shared" }
 anyhow = "1.0.86"
+lazy-regex = "3.1.0"
 
 [lib]
 proc-macro = true
