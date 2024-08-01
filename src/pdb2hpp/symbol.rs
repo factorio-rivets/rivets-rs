@@ -54,8 +54,12 @@ impl Symbol {
     }
 
     pub fn replace_unnamed_types(name: &str) -> String {
+        let name = name.replace("<unnamed-tag>", "unnamed_tag");
+        let name = regex!(r"<lambda_(\w+?)>").replace_all(&name, "lambda_$1")
+        .into_owned();
+
         regex!(r"<unnamed-(type|enum)-(.+?)>")
-            .replace_all(name, |captures: &regex::Captures| {
+            .replace_all(&name, |captures: &regex::Captures| {
                 captures
                     .get(2)
                     .expect("Compiled regex will always have a capture group")
@@ -70,7 +74,11 @@ impl Symbol {
 impl Symbol {
     pub fn as_str(&self) -> &str {
         match &self.name {
-            Type::Symbol(s) => s.find('<').map_or_else(|| s.as_str(), |i| &s[..i]),
+            Type::Symbol(s) => {
+                let without_templates = s.find('<').map_or_else(|| s.as_str(), |i| &s[..i]);
+                assert!(!without_templates.ends_with("::"), "Symbol::as_str() called on a symbol with trailing '::': {s}");
+                without_templates
+            },
             Type::String(s) => s,
             Type::None => NONETYPE_ERROR,
         }

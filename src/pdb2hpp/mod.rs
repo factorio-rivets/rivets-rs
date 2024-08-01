@@ -398,11 +398,12 @@ impl<'a> DecompilationResult<'a> {
                     type_name = nested_class.name;
                     self.drain_dependencies_inner(dependencies.get_mut(), base_classes.get_mut());
                 } else {
-                    //self.dependencies.get_mut().insert(type_name.to_string());
+                    self.dependencies.get_mut().insert(type_name.to_string());
                 }
 
                 format!(
-                    "/* offset {offset:3} */ {type_name} {field_name}{}",
+                    "/* offset {offset:3} */ {} {field_name}{}",
+                    type_name.fully_qualifed(),
                     dc.name_suffix
                 )
             }
@@ -701,11 +702,12 @@ impl<'a> DecompilationResult<'a> {
                         type_finder,
                         arg_type,
                     );
-                    args.push_str(dc.name.as_str());
+                    args.push_str(&dc.name.fully_qualifed());
                     args.push(' ');
                     args.push_str(&number_to_method_arg_name(i));
                     args.push_str(&dc.name_suffix);
                     args.push(',');
+                    self.dependencies.get_mut().insert(dc.name.to_string());
                 }
                 args.pop(); // remove the last comma
                 args
@@ -820,13 +822,13 @@ impl<'a> DecompilationResult<'a> {
             .as_string()
         });
 
-        let dc = DecompilationResult::from_index(
+        let argument_list = DecompilationResult::from_index(
             self.nested_classes,
             Some(self),
             type_finder,
             data.argument_list,
         );
-        let arguments = dc.repersentation;
+        let arguments = argument_list.repersentation;
 
         format!("/* offset {:3} */ {field_attributes}{return_type}{calling_convention}{method_name}({arguments})", data.this_adjustment)
     }
@@ -994,27 +996,27 @@ impl<'a> NestedClassesAndUnions<'a> {
                 return Ok(());
             }
 
-            let name = Symbol::replace_unnamed_types(
-                &match &data {
+            let name = Symbol::new(
+                match &data {
                     pdb::TypeData::Class(data)
-                        if data.properties.is_nested_type() && data.properties.sealed() =>
+                        if data.properties.is_nested_type() =>
                     {
                         data.name
                     }
                     pdb::TypeData::Union(data)
-                        if data.properties.is_nested_type() && data.properties.sealed() =>
+                        if data.properties.is_nested_type() =>
                     {
                         data.name
                     }
                     _ => return Ok(()),
-                }
-                .to_string(),
+                }.to_string().into_owned()
             );
 
-            by_data.insert(name, data);
+            by_data.insert(name.to_string(), data);
 
             Ok(())
         });
+        println!("{:?}", by_data.keys().collect::<Vec<_>>());
 
         //println!("{:?}", by_data.keys().collect::<Vec<_>>());
 
@@ -1040,7 +1042,6 @@ fn decompile_forward_refrences<'a>(
     nested_classes: &'a NestedClassesAndUnions<'a>,
     type_finder: &'a pdb::TypeFinder<'_>,
     type_information: &pdb::TypeInformation,
-    lambda_names: &mut Vec<String>,
 ) -> String {
     let mut forward_refrences = HashSet::new();
 
@@ -1068,7 +1069,6 @@ fn decompile_forward_refrences<'a>(
 
         let dc = DecompilationResult::from_data(nested_classes, None, type_finder, data);
         let forward_refrence = dc.namespaced_repersentation();
-        let forward_refrence = qualify_all_lambda_names(&forward_refrence, lambda_names);
 
         forward_refrences.insert(forward_refrence);
 
@@ -1080,21 +1080,6 @@ fn decompile_forward_refrences<'a>(
     let mut forward_refrences = forward_refrences.join("\n");
     forward_refrences.push('\n');
     forward_refrences
-}
-
-fn qualify_all_lambda_names(header_file: &str, lambda_names: &mut Vec<String>) -> String {
-    let header_file = regex!(r"<lambda_(\w+?)>")
-        .replace_all(header_file, |lambda_name: &regex::Captures| {
-            let lambda_name = lambda_name
-                .get(1)
-                .expect("Compiled regex will always have a capture group")
-                .as_str()
-                .to_owned();
-            lambda_names.push(lambda_name);
-            "__#@#LAMBDA@##__"
-        })
-        .into_owned();
-    header_file
 }
 
 fn is_std_namespace(data: &pdb::TypeData<'_>) -> bool {
@@ -1111,11 +1096,10 @@ fn is_std_namespace(data: &pdb::TypeData<'_>) -> bool {
 
 fn topological_sort(
     classes_and_unions: &HashMap<String, DecompilationResult>,
-    lambda_names: &mut Vec<String>,
 ) -> Result<Vec<String>> {
     let mut topo_sort = TopoSort::with_capacity(classes_and_unions.len());
     for dc in classes_and_unions.values() {
-        let dependencies = dc.dependencies.borrow();
+        let dependencies = dc.base_classes.borrow();
         let dependencies: Vec<String> = dependencies
             .iter()
             .filter(|d| classes_and_unions.contains_key(*d))
@@ -1142,8 +1126,7 @@ fn topological_sort(
             let dc = classes_and_unions
                 .get(&name)
                 .unwrap_or_else(|| panic!("sort order will have all the names: {name}"));
-            let s = dc.namespaced_repersentation();
-            qualify_all_lambda_names(&s, lambda_names)
+            dc.namespaced_repersentation()
         })
         .collect();
 
@@ -1151,14 +1134,14 @@ fn topological_sort(
 }
 
 fn decompile_classes_unions_and_enums<'a>(
+    target: Option<&str>,
     nested_classes: &'a NestedClassesAndUnions<'a>,
     type_finder: &'a pdb::TypeFinder<'_>,
     type_information: &pdb::TypeInformation,
-    lambda_names: &mut Vec<String>,
 ) -> String {
     // this is a hashmap becuase enums in the factorio pdb seem to exist multiple times with the same name.
     // we are taking only the most recent occurance.
-    let mut enums: HashMap<String, String> = HashMap::new();
+    let mut enums: HashMap<String, DecompilationResult> = HashMap::new();
     let mut classes_and_unions: HashMap<String, DecompilationResult> = HashMap::new();
 
     let progressbar = indicatif::ProgressBar::new(type_information.len() as u64);
@@ -1202,23 +1185,67 @@ fn decompile_classes_unions_and_enums<'a>(
 
         let dc = DecompilationResult::from_data(nested_classes, None, type_finder, data);
 
+        let type_name = dc.name.as_str().to_string();
         if is_enum {
-            let s = dc.namespaced_repersentation();
-            let s = qualify_all_lambda_names(&s, lambda_names);
-            enums.insert(dc.name.as_str().to_string(), s);
+            enums.insert(type_name, dc);
         } else {
-            classes_and_unions.insert(dc.name.as_str().to_string(), dc);
+            classes_and_unions.insert(type_name, dc);
         }
 
         Ok(())
     });
 
-    let enums: HashSet<String> = enums.drain().map(|(_, v)| v).collect();
+    if let Some(target) = target {
+        fn get_dependencies_of_target_recursive(
+            target: &str,
+            enums: &HashMap<String, DecompilationResult>,
+            classes_and_unions: &HashMap<String, DecompilationResult>,
+        ) -> Vec<String> {
+            let mut visited = HashSet::new();
+            let mut stack = vec![target.to_string()];
+            while let Some(name) = stack.pop() {
+                if visited.contains(&name) {
+                    continue;
+                }
+                let dcs = [classes_and_unions.get(&name), enums.get(&name)]
+                    .into_iter()
+                    .flatten();
+                for dc in dcs {
+                    dc.dependencies.borrow().iter().for_each(|dependency| {
+                        stack.push(dependency.to_string());
+                    });
+                }
+                visited.insert(name);
+            }
+            let mut dependencies: Vec<String> = visited
+                .into_iter()
+                .filter(|dependency| {
+                    classes_and_unions.contains_key(dependency) || enums.contains_key(dependency)
+                })
+                .collect();
+            dependencies.sort();
+            dependencies
+        }
+
+        let dependencies =
+            get_dependencies_of_target_recursive(target, &enums, &classes_and_unions);
+        println!("Dependencies of {target}: {dependencies:?}",);
+
+        enums.retain(|name, _| dependencies.contains(name));
+        classes_and_unions.retain(|name, _| dependencies.contains(name));
+    }
+
+    let enums: HashSet<String> = enums
+        .drain()
+        .map(|(_, dc)| {
+            dc.namespaced_repersentation()
+        })
+        .collect();
     let mut enums: Vec<String> = enums.into_iter().collect();
     enums.sort();
 
     let mut classes_and_unions =
-        topological_sort(&classes_and_unions, lambda_names).expect("Detected a dependency cycle");
+        topological_sort(&classes_and_unions).expect("Detected a dependency cycle");
 
     let mut classes_unions_and_enums = enums;
     classes_unions_and_enums.append(&mut classes_and_unions);
@@ -1252,18 +1279,16 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
     }
 
     let nested_classes = NestedClassesAndUnions::new(&type_finder, &type_information);
-    let mut lambda_names = Vec::new();
     let mut classes_unions_and_enums = decompile_classes_unions_and_enums(
+        Some("lua_State"),
         &nested_classes,
         &type_finder,
         &type_information,
-        &mut lambda_names,
     );
     let forward_refrences = decompile_forward_refrences(
         &nested_classes,
         &type_finder,
         &type_information,
-        &mut lambda_names,
     );
 
     let mut typedefs_str = String::new();
@@ -1295,15 +1320,6 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
 
     let header_file = format!("// automatically generated by pdb2hpp\n// do not edit\n\n{includes}\n\ntypedef long HRESULT;\n{typedefs_str}\n\n{forward_refrences}\n{classes_unions_and_enums}");
     let mut header_file = header_file.replace("`anonymous-namespace'", "anonymous");
-
-    let mut lambda_name_map = HashMap::new();
-    header_file = regex!("__#@#LAMBDA@##__").replace_all(&header_file, |_: &regex::Captures| {
-        let lambda_name = lambda_names.pop().expect("lambda_names will have the same length as the number of lambdas in the header file");
-        let len = lambda_name_map.len();
-        let i = lambda_name_map.entry(lambda_name).or_insert(len);
-        format!("lambda_{i}")
-    }).into_owned();
-
     header_file = replace_pointers_to_errors(&header_file);
 
     println!(
