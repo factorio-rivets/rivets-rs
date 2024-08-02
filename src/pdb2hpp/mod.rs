@@ -1,6 +1,6 @@
 mod symbol;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use core::panic;
 use lazy_regex::regex;
 use std::cell::RefCell;
@@ -10,7 +10,6 @@ use std::io::Write;
 use std::path::Path;
 use std::time::Instant;
 use symbol::Symbol;
-use topo_sort::{SortResults, TopoSort};
 
 use pdb::FallibleIterator;
 
@@ -178,9 +177,6 @@ struct DecompilationResult<'a> {
     repersentation: String,
     /// Thing that does stuff.
     name: Symbol,
-    /// An interior-mutable set of all the types that this type depends on. Used for topological sorting.
-    /// This is required becuase clang expects all types to be defined before they are used.
-    dependencies: RefCell<HashSet<String>>,
     /// The type data from pdb crate that this result is based on.
     /// This is an optional in order to handle pdb parsing errors.
     data: Option<pdb::TypeData<'a>>,
@@ -247,7 +243,6 @@ impl<'a> DecompilationResult<'a> {
             nested_classes,
             repersentation: String::new(),
             name: Symbol::none(),
-            dependencies: RefCell::new(HashSet::new()),
             data: Some(data),
             type_finder,
             base_classes: RefCell::new(HashSet::new()),
@@ -255,8 +250,9 @@ impl<'a> DecompilationResult<'a> {
         };
 
         dc.calculate_name();
+
         if let Some(parent) = parent {
-            parent.drain_dependencies(&dc);
+            parent.drain_base_classes(&dc);
         }
 
         dc
@@ -275,7 +271,6 @@ impl<'a> DecompilationResult<'a> {
                 nested_classes,
                 repersentation: format!("/* error processing type index {type_index} {e}*/"),
                 name: Symbol::none(),
-                dependencies: RefCell::new(HashSet::new()),
                 data: None,
                 type_finder,
                 base_classes: RefCell::new(HashSet::new()),
@@ -390,15 +385,12 @@ impl<'a> DecompilationResult<'a> {
                 );
                 let offset = data.offset;
                 let field_name = data.name.to_string().into_owned();
-                let mut dependencies = dc.dependencies;
                 let mut base_classes = dc.base_classes;
                 let mut type_name = dc.name;
 
                 if let Some(nested_class) = self.nested_classes.find(&type_name) {
                     type_name = nested_class.name;
-                    self.drain_dependencies_inner(dependencies.get_mut(), base_classes.get_mut());
-                } else {
-                    self.dependencies.get_mut().insert(type_name.to_string());
+                    self.drain_base_classes_inner(base_classes.get_mut());
                 }
 
                 format!(
@@ -432,7 +424,6 @@ impl<'a> DecompilationResult<'a> {
                 self.base_classes
                     .get_mut()
                     .insert(format!("{attributes}{}", dc.name));
-                self.dependencies.get_mut().insert(dc.name.to_string());
 
                 format!(
                     "/* offset {:3} */ /* fields for {} */",
@@ -440,9 +431,10 @@ impl<'a> DecompilationResult<'a> {
                 )
             }
             Some(pdb::TypeData::Primitive(data)) => primitive_name(*data), // A primitive type in c++. See primitive_name() for a full list.
-            Some(pdb::TypeData::Class(_)) => {
+            Some(pdb::TypeData::Class(data)) => {
                 // A class type in c++
                 // TODO handle data.properties
+                println!("class: {}", data.name);
                 self.class_to_string()
             }
             Some(pdb::TypeData::FieldList(data)) => {
@@ -707,7 +699,6 @@ impl<'a> DecompilationResult<'a> {
                     args.push_str(&number_to_method_arg_name(i));
                     args.push_str(&dc.name_suffix);
                     args.push(',');
-                    self.dependencies.get_mut().insert(dc.name.to_string());
                 }
                 args.pop(); // remove the last comma
                 args
@@ -770,20 +761,12 @@ impl<'a> DecompilationResult<'a> {
         format!("{properties}{templates_prefix}{kind} {type_name} {base_classes} {{\n{fields}\n}}")
     }
 
-    fn drain_dependencies(&self, other: &Self) {
-        self.drain_dependencies_inner(
-            &mut other.dependencies.borrow_mut(),
-            &mut other.base_classes.borrow_mut(),
-        );
+    fn drain_base_classes(&self, other: &Self) {
+        self.drain_base_classes_inner(&mut other.base_classes.borrow_mut());
     }
 
-    fn drain_dependencies_inner(
-        &self,
-        dependencies: &mut HashSet<String>,
-        base_classes: &mut HashSet<String>,
-    ) {
+    fn drain_base_classes_inner(&self, base_classes: &mut HashSet<String>) {
         self.base_classes.borrow_mut().extend(base_classes.drain());
-        self.dependencies.borrow_mut().extend(dependencies.drain());
     }
 
     fn method_to_string(
@@ -841,7 +824,7 @@ impl<'a> DecompilationResult<'a> {
             return format!("{repersentation};");
         }
 
-        let data_structure = repersentation.replacen(self.name.as_str(), &short_name, 1);
+        let data_structure = repersentation.replacen(&self.name.to_string(), &short_name, 1);
 
         let mut namespaced_string = String::new();
         for namespace in &namespaces {
@@ -998,27 +981,18 @@ impl<'a> NestedClassesAndUnions<'a> {
 
             let name = Symbol::new(
                 match &data {
-                    pdb::TypeData::Class(data)
-                        if data.properties.is_nested_type() =>
-                    {
-                        data.name
-                    }
-                    pdb::TypeData::Union(data)
-                        if data.properties.is_nested_type() =>
-                    {
-                        data.name
-                    }
+                    pdb::TypeData::Class(data) if data.properties.is_nested_type() => data.name,
+                    pdb::TypeData::Union(data) if data.properties.is_nested_type() => data.name,
                     _ => return Ok(()),
-                }.to_string().into_owned()
+                }
+                .to_string()
+                .into_owned(),
             );
 
             by_data.insert(name.to_string(), data);
 
             Ok(())
         });
-        println!("{:?}", by_data.keys().collect::<Vec<_>>());
-
-        //println!("{:?}", by_data.keys().collect::<Vec<_>>());
 
         Self {
             by_data,
@@ -1027,7 +1001,7 @@ impl<'a> NestedClassesAndUnions<'a> {
     }
 
     fn find(&self, name: &Symbol) -> Option<DecompilationResult<'_>> {
-        let data = self.by_data.get(name.as_str())?;
+        let data = self.by_data.get(&name.to_string())?;
         Some(DecompilationResult::from_data(
             self,
             None,
@@ -1094,55 +1068,15 @@ fn is_std_namespace(data: &pdb::TypeData<'_>) -> bool {
     })
 }
 
-fn topological_sort(
-    classes_and_unions: &HashMap<String, DecompilationResult>,
-) -> Result<Vec<String>> {
-    let mut topo_sort = TopoSort::with_capacity(classes_and_unions.len());
-    for dc in classes_and_unions.values() {
-        let dependencies = dc.base_classes.borrow();
-        let dependencies: Vec<String> = dependencies
-            .iter()
-            .filter(|d| classes_and_unions.contains_key(*d))
-            .cloned()
-            .collect();
-        //println!("{} depends on {dependencies:?}", dc.name.raw_name());
-        topo_sort.insert(dc.name.as_str().to_string(), dependencies);
-        /*if topo_sort.try_vec_nodes().is_err() {
-            bail!(format!(
-                "Detected a dependency cycle in {}",
-                dc.name.raw_name()
-            ));
-        }*/
-    }
-
-    let sort_order = match topo_sort.into_vec_nodes() {
-        SortResults::Full(nodes) => nodes,
-        SortResults::Partial(_) => bail!("Detected a dependency cycle"),
-    };
-
-    let classes_and_unions: Vec<String> = sort_order
-        .into_iter()
-        .map(|name| {
-            let dc = classes_and_unions
-                .get(&name)
-                .unwrap_or_else(|| panic!("sort order will have all the names: {name}"));
-            dc.namespaced_repersentation()
-        })
-        .collect();
-
-    Ok(classes_and_unions)
-}
-
 fn decompile_classes_unions_and_enums<'a>(
-    target: Option<&str>,
+    target: &str,
     nested_classes: &'a NestedClassesAndUnions<'a>,
     type_finder: &'a pdb::TypeFinder<'_>,
     type_information: &pdb::TypeInformation,
 ) -> String {
     // this is a hashmap becuase enums in the factorio pdb seem to exist multiple times with the same name.
     // we are taking only the most recent occurance.
-    let mut enums: HashMap<String, DecompilationResult> = HashMap::new();
-    let mut classes_and_unions: HashMap<String, DecompilationResult> = HashMap::new();
+    let mut classes_and_unions: Vec<DecompilationResult> = Vec::new();
 
     let progressbar = indicatif::ProgressBar::new(type_information.len() as u64);
     let mut i = 0;
@@ -1163,95 +1097,51 @@ fn decompile_classes_unions_and_enums<'a>(
             return Ok(());
         }
 
-        let mut is_enum = false;
-        match &data {
+        let type_name = match &data {
             pdb::TypeData::Class(data)
                 if !data.properties.forward_reference()
                     && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() => {}
+                    && !data.properties.scoped_definition() =>
+            {
+                data.name
+            }
             pdb::TypeData::Union(data)
                 if !data.properties.forward_reference()
                     && !data.properties.is_nested_type()
-                    && !data.properties.scoped_definition() => {}
+                    && !data.properties.scoped_definition() =>
+            {
+                data.name
+            }
             pdb::TypeData::Enumeration(data)
                 if !data.properties.forward_reference()
                     && !data.properties.is_nested_type()
                     && !data.properties.scoped_definition() =>
             {
-                is_enum = true;
+                data.name
             }
             _ => return Ok(()),
         };
 
-        let dc = DecompilationResult::from_data(nested_classes, None, type_finder, data);
-
-        let type_name = dc.name.as_str().to_string();
-        if is_enum {
-            enums.insert(type_name, dc);
-        } else {
-            classes_and_unions.insert(type_name, dc);
+        let type_name = Symbol::new(type_name.to_string().into_owned());
+        if type_name.to_string() != target {
+            return Ok(());
         }
+
+        let dc = DecompilationResult::from_data(nested_classes, None, type_finder, data);
+        classes_and_unions.push(dc);
 
         Ok(())
     });
 
-    if let Some(target) = target {
-        fn get_dependencies_of_target_recursive(
-            target: &str,
-            enums: &HashMap<String, DecompilationResult>,
-            classes_and_unions: &HashMap<String, DecompilationResult>,
-        ) -> Vec<String> {
-            let mut visited = HashSet::new();
-            let mut stack = vec![target.to_string()];
-            while let Some(name) = stack.pop() {
-                if visited.contains(&name) {
-                    continue;
-                }
-                let dcs = [classes_and_unions.get(&name), enums.get(&name)]
-                    .into_iter()
-                    .flatten();
-                for dc in dcs {
-                    dc.dependencies.borrow().iter().for_each(|dependency| {
-                        stack.push(dependency.to_string());
-                    });
-                }
-                visited.insert(name);
-            }
-            let mut dependencies: Vec<String> = visited
-                .into_iter()
-                .filter(|dependency| {
-                    classes_and_unions.contains_key(dependency) || enums.contains_key(dependency)
-                })
-                .collect();
-            dependencies.sort();
-            dependencies
-        }
-
-        let dependencies =
-            get_dependencies_of_target_recursive(target, &enums, &classes_and_unions);
-        println!("Dependencies of {target}: {dependencies:?}",);
-
-        enums.retain(|name, _| dependencies.contains(name));
-        classes_and_unions.retain(|name, _| dependencies.contains(name));
-    }
-
-    let enums: HashSet<String> = enums
-        .drain()
-        .map(|(_, dc)| {
-            dc.namespaced_repersentation()
-        })
+    let mut classes_and_unions: Vec<String> = classes_and_unions
+        .into_iter()
+        .map(|dc| dc.namespaced_repersentation())
         .collect();
-    let mut enums: Vec<String> = enums.into_iter().collect();
-    enums.sort();
+    classes_and_unions.sort();
 
-    let mut classes_and_unions =
-        topological_sort(&classes_and_unions).expect("Detected a dependency cycle");
-
-    let mut classes_unions_and_enums = enums;
-    classes_unions_and_enums.append(&mut classes_and_unions);
-    let mut classes_unions_and_enums = classes_unions_and_enums.join("\n");
-    classes_unions_and_enums.push('\n');
-    classes_unions_and_enums
+    let mut classes_and_unions = classes_and_unions.join("\n");
+    classes_and_unions.push('\n');
+    classes_and_unions
 }
 
 fn replace_pointers_to_errors(s: &str) -> String {
@@ -1280,16 +1170,13 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
 
     let nested_classes = NestedClassesAndUnions::new(&type_finder, &type_information);
     let mut classes_unions_and_enums = decompile_classes_unions_and_enums(
-        Some("lua_State"),
+        "Surface",
         &nested_classes,
         &type_finder,
         &type_information,
     );
-    let forward_refrences = decompile_forward_refrences(
-        &nested_classes,
-        &type_finder,
-        &type_information,
-    );
+    let forward_refrences =
+        decompile_forward_refrences(&nested_classes, &type_finder, &type_information);
 
     let mut typedefs_str = String::new();
     for (from, to) in typedefs() {
