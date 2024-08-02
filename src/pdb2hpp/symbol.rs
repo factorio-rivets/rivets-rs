@@ -8,7 +8,7 @@ use lazy_regex::{regex, regex_is_match};
 /// The full type name including namespaces and template types. ie `std::vector<int>`
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Type {
-    Symbol(String),
+    Symbol(String, String),
     String(String),
     None,
 }
@@ -23,7 +23,12 @@ pub struct Symbol {
 
 impl Display for Symbol {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_str())
+        let s: &str = match &self.name {
+            Type::Symbol(s, _) => s,
+            Type::String(s) => s,
+            Type::None => NONETYPE_ERROR,
+        };
+        write!(f, "{}", s)
     }
 }
 
@@ -42,7 +47,8 @@ impl Symbol {
     #[allow(clippy::needless_pass_by_value)]
     pub fn new(name: String) -> Self {
         let unlambdad = Self::replace_unnamed_types(&name);
-        Self::_new(Type::Symbol(unlambdad))
+        let without_templates = Self::remove_template_types(&unlambdad);
+        Self::_new(Type::Symbol(without_templates, unlambdad))
     }
 
     pub const fn from_string(name: String) -> Self {
@@ -55,8 +61,9 @@ impl Symbol {
 
     pub fn replace_unnamed_types(name: &str) -> String {
         let name = name.replace("<unnamed-tag>", "unnamed_tag");
-        let name = regex!(r"<lambda_(\w+?)>").replace_all(&name, "lambda_$1")
-        .into_owned();
+        let name = regex!(r"<lambda_(\w+?)>")
+            .replace_all(&name, "lambda_$1")
+            .into_owned();
 
         regex!(r"<unnamed-(type|enum)-(.+?)>")
             .replace_all(&name, |captures: &regex::Captures| {
@@ -68,22 +75,33 @@ impl Symbol {
             })
             .into_owned()
     }
+
+    pub fn remove_template_types(name: &str) -> String {
+        let mut result = String::new();
+        let mut template_depth = 0;
+        for ch in name.chars() {
+            match ch {
+                '<' => {
+                    template_depth += 1;
+                }
+                '>' => {
+                    template_depth -= 1;
+                }
+                _ => {
+                    if template_depth == 0 {
+                        result.push(ch);
+                    }
+                }
+            }
+        }
+
+        assert!(!result.ends_with("::"));
+        result
+    }
 }
 
 // This impl block contains all the instance functions on the Symbol class.
 impl Symbol {
-    pub fn as_str(&self) -> &str {
-        match &self.name {
-            Type::Symbol(s) => {
-                let without_templates = s.find('<').map_or_else(|| s.as_str(), |i| &s[..i]);
-                assert!(!without_templates.ends_with("::"), "Symbol::as_str() called on a symbol with trailing '::': {s}");
-                without_templates
-            },
-            Type::String(s) => s,
-            Type::None => NONETYPE_ERROR,
-        }
-    }
-
     pub fn increment_pointer_count(&self) {
         self.pointer_count.set(self.pointer_count.get() + 1);
     }
@@ -94,7 +112,7 @@ impl Symbol {
 
     pub fn fully_qualifed(&self) -> String {
         match &self.name {
-            Type::Symbol(s) => {
+            Type::Symbol(_, s) => {
                 let pointers = self.pointer_count.get();
                 let pointers = "*".repeat(pointers);
                 let modifiers = &self.modifiers.borrow();
@@ -107,7 +125,7 @@ impl Symbol {
     }
 
     pub fn namespace_vec(&self) -> Vec<String> {
-        let s = self.as_str();
+        let s = self.to_string();
 
         let mut result = Vec::new();
         let mut current = String::new();
@@ -151,61 +169,39 @@ impl Symbol {
     /// We need to split template types by commas, however sometimes nested templates contain commas inside <>.
     /// This is a special implementation of the `split()` function to handle the above case.
     fn templates_vec(&self) -> Vec<String> {
-        let Type::Symbol(type_name) = &self.name else {
+        let Type::Symbol(_, type_name) = &self.name else {
             return Vec::new();
         };
-
-        let re = regex!(r"(.+?)<(.*)>");
-        let Some(captures) = re.captures(type_name) else {
-            return Vec::new();
-        };
-
-        let class_name_without_templates = captures
-            .get(1)
-            .expect("Static regex always has one group")
-            .as_str();
-
-        // This handles the special case of my_namespace::<unnamed-class-MyClass>
-        if class_name_without_templates.ends_with("::") {
-            return Vec::new();
-        }
-
-        let templates = captures
-            .get(2)
-            .expect("Static regex always has two groups")
-            .as_str();
 
         let mut result = Vec::new();
         let mut current = String::new();
         let mut template_depth = 0;
 
-        let chars: Vec<char> = templates.chars().collect();
-
-        for char in chars {
+        for char in type_name.chars().skip(type_name.find("::").unwrap_or(0)) {
             match char {
                 '<' | '(' => {
+                    if template_depth != 0 {current.push(char);}
                     template_depth += 1;
-                    current.push(char);
                 }
                 '>' | ')' => {
                     template_depth -= 1;
                     if template_depth < 0 {
                         template_depth = 0;
                     }
-                    current.push(char);
+                    if template_depth != 0 {current.push(char);}
                 }
-                ',' if template_depth == 0 => {
-                    result.push(current);
-                    current = String::with_capacity(32);
+                ',' if template_depth == 1 => {
+                    result.push(current.trim().to_string());
+                    current.clear();
                 }
                 _ => {
-                    current.push(char);
+                    if template_depth != 0 {current.push(char);}
                 }
             }
         }
 
         if !current.is_empty() {
-            result.push(current);
+            result.push(current.trim().to_string());
         }
 
         result
@@ -278,5 +274,113 @@ impl Symbol {
 
         result.push_str("> ");
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_symbol_templates() {
+        let symbol = Symbol::new("my_namespace::MyClass<int, std::string>".to_string());
+        let templates = symbol.templates_vec();
+        assert_eq!(templates, vec!["int", "std::string"]);
+        let templates = symbol.templates_by_type();
+        assert_eq!(
+            templates,
+            vec![
+                ("typename".to_string(), "T".to_string(), "int".to_string()),
+                (
+                    "typename".to_string(),
+                    "U".to_string(),
+                    "std::string".to_string()
+                )
+            ]
+        );
+
+        let symbol = Symbol::new("my_namespace::MyClass<int, std::string, 10.5>".to_string());
+        let templates = symbol.templates_by_type();
+        assert_eq!(
+            templates,
+            vec![
+                ("typename".to_string(), "T".to_string(), "int".to_string()),
+                (
+                    "typename".to_string(),
+                    "U".to_string(),
+                    "std::string".to_string()
+                ),
+                ("double".to_string(), "V".to_string(), "10.5".to_string())
+            ]
+        );
+
+        let symbol = Symbol::new("my_namespace::MyClass<int, std::string, 10.5, 8>".to_string());
+        let templates = symbol.templates_by_type();
+        assert_eq!(
+            templates,
+            vec![
+                ("typename".to_string(), "T".to_string(), "int".to_string()),
+                (
+                    "typename".to_string(),
+                    "U".to_string(),
+                    "std::string".to_string()
+                ),
+                ("double".to_string(), "V".to_string(), "10.5".to_string()),
+                ("long long".to_string(), "W".to_string(), "8".to_string())
+            ]
+        );
+
+        let symbol = Symbol::new(
+            "my_namespace::MyClass<my_namespace::MyClass<int, std::string>, 7.999>".to_string(),
+        );
+        let templates = symbol.templates_by_type();
+        assert_eq!(
+            templates,
+            vec![
+                (
+                    "typename".to_string(),
+                    "T".to_string(),
+                    "my_namespace::MyClass<int, std::string>".to_string()
+                ),
+                ("double".to_string(), "U".to_string(), "7.999".to_string())
+            ]
+        );
+    }
+
+    #[test]
+    fn test_name_parsing() {
+        let symbol = Symbol::new("my_namespace::MyClass<int, std::string<string>>".to_string());
+        symbol.increment_pointer_count();
+        let namespace = symbol.namespace_vec();
+        assert_eq!(
+            namespace,
+            vec!["my_namespace".to_string(), "MyClass".to_string()]
+        );
+        assert_eq!(symbol.to_string(), "my_namespace::MyClass".to_string());
+        assert_eq!(
+            symbol.fully_qualifed(),
+            "my_namespace::MyClass<int, std::string<string>>*"
+        );
+        assert_eq!(
+            symbol.templates_by_type(),
+            vec![
+                ("typename".to_string(), "T".to_string(), "int".to_string()),
+                (
+                    "typename".to_string(),
+                    "U".to_string(),
+                    "std::string<string>".to_string()
+                )
+            ]
+        );
+
+        let symbol = Symbol::new("my_namespace<int, std::string, 10.5>::MyClass".to_string());
+        let namespace = symbol.namespace_vec();
+        assert_eq!(
+            namespace,
+            vec!["my_namespace".to_string(), "MyClass".to_string()]
+        );
+        assert_eq!(symbol.to_string(), "my_namespace::MyClass".to_string());
+        assert_eq!(symbol.fully_qualifed(), "my_namespace<int, std::string, 10.5>::MyClass");
+        assert_eq!(symbol.templates_by_type().len(), 0);
     }
 }
