@@ -393,12 +393,12 @@ impl<'a> DecompilationResult<'a> {
                 {
                     self.drain_base_classes_inner(base_classes.get_mut());
                     format!(
-                        "/* offset {offset:3} */ {} {field_name}{}",
+                        "/* offset {offset:4} */ {} {field_name}{}",
                         nested_class_repersentation, dc.name_suffix
                     )
                 } else {
                     format!(
-                        "/* offset {offset:3} */ {} {field_name}{}",
+                        "/* offset {offset:4} */ {} {field_name}{}",
                         type_name.fully_qualifed(),
                         dc.name_suffix
                     )
@@ -411,7 +411,7 @@ impl<'a> DecompilationResult<'a> {
                     type_finder,
                     data.field_type,
                 );
-                format!("/* static member */ static {} staticVar", dc.name)
+                format!("/* static member */ static {} staticVar /* info: the varible names for static class members are unrecoverable. `staticVar` is used as a placeholder */", dc.name.fully_qualifed())
             }
             Some(pdb::TypeData::BaseClass(data)) => {
                 let attributes = FieldAttributes {
@@ -431,7 +431,7 @@ impl<'a> DecompilationResult<'a> {
                     .insert(format!("{attributes}{}", dc.name));
 
                 format!(
-                    "/* offset {:3} */ /* fields for {} */",
+                    "/* offset {:4} */ /* fields for {} */",
                     data.offset, dc.name
                 )
             }
@@ -596,7 +596,7 @@ impl<'a> DecompilationResult<'a> {
                     data.element_type,
                 );
                 match data.stride {
-                    Some(stride) => format!("/* stride {stride:3} */ {}", dc.repersentation),
+                    Some(stride) => format!("/* stride {stride:4} */ {}", dc.repersentation),
                     None => dc.repersentation,
                 }
             }
@@ -687,7 +687,7 @@ impl<'a> DecompilationResult<'a> {
                     data.underlying_type,
                 );
                 self.name_suffix = format!(" : {}", data.length);
-                format!("/* position {:3} */ {}", data.position, dc.repersentation)
+                format!("/* position {:4} */ {}", data.position, dc.repersentation)
             }
             Some(pdb::TypeData::ArgumentList(data)) => {
                 let mut args = String::new();
@@ -817,7 +817,7 @@ impl<'a> DecompilationResult<'a> {
         );
         let arguments = argument_list.repersentation;
 
-        format!("/* offset {:3} */ {field_attributes}{return_type}{calling_convention}{method_name}({arguments})", data.this_adjustment)
+        format!("/* offset {:4} */ {field_attributes}{return_type}{calling_convention}{method_name}({arguments})", data.this_adjustment)
     }
 
     fn namespaced_repersentation(&self) -> String {
