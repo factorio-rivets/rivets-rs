@@ -386,9 +386,11 @@ impl<'a> DecompilationResult<'a> {
                 let offset = data.offset;
                 let field_name = data.name.to_string().into_owned();
                 let mut base_classes = dc.base_classes;
-                let mut type_name = dc.name;
+                let type_name = dc.name;
 
-                if let Some(nested_class_repersentation) = unsafe { self.nested_classes.find(&type_name) } {
+                if let Some(nested_class_repersentation) =
+                    unsafe { self.nested_classes.find(&type_name) }
+                {
                     self.drain_base_classes_inner(base_classes.get_mut());
                     format!(
                         "/* offset {offset:3} */ {} {field_name}{}",
@@ -434,7 +436,7 @@ impl<'a> DecompilationResult<'a> {
                 )
             }
             Some(pdb::TypeData::Primitive(data)) => primitive_name(*data), // A primitive type in c++. See primitive_name() for a full list.
-            Some(pdb::TypeData::Class(data)) => {
+            Some(pdb::TypeData::Class(_)) => {
                 // A class type in c++
                 // TODO handle data.properties
                 self.class_to_string()
@@ -1014,10 +1016,8 @@ impl<'a> NestedClassesAndUnions<'a> {
     /// todo: fix
     unsafe fn find(&self, name: &Symbol) -> Option<String> {
         let data = self.by_data.get(&name.to_string())?;
-        Some(
-            DecompilationResult::from_data(self, None, self.type_finder, data.clone())
-                .repersentation,
-        )
+        let dc = DecompilationResult::from_data(self, None, self.type_finder, data.clone());
+        Some(dc.namespaced_repersentation())
     }
 }
 
