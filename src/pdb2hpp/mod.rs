@@ -1,6 +1,6 @@
 mod symbol;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use core::panic;
 use lazy_regex::regex;
 use std::cell::RefCell;
@@ -1083,10 +1083,11 @@ fn decompile_classes_unions_and_enums<'a>(
     nested_classes: &'a NestedClassesAndUnions<'a>,
     type_finder: &'a pdb::TypeFinder<'_>,
     type_information: &pdb::TypeInformation,
-) -> String {
+) -> Result<String> {
     // this is a hashmap becuase enums in the factorio pdb seem to exist multiple times with the same name.
     // we are taking only the most recent occurance.
     let mut classes_and_unions: Vec<DecompilationResult> = Vec::new();
+    let mut found_any = false;
 
     let progressbar = indicatif::ProgressBar::new(type_information.len() as u64);
     let mut i = 0;
@@ -1137,11 +1138,16 @@ fn decompile_classes_unions_and_enums<'a>(
             return Ok(());
         }
 
+        found_any = true;
         let dc = DecompilationResult::from_data(nested_classes, None, type_finder, data);
         classes_and_unions.push(dc);
 
         Ok(())
     });
+
+    if !found_any {
+        bail!("Could not find any classes, unions, or enums with the name {target}");
+    }
 
     let mut classes_and_unions: Vec<String> = classes_and_unions
         .into_iter()
@@ -1151,7 +1157,7 @@ fn decompile_classes_unions_and_enums<'a>(
 
     let mut classes_and_unions = classes_and_unions.join("\n");
     classes_and_unions.push('\n');
-    classes_and_unions
+    Ok(classes_and_unions)
 }
 
 fn replace_pointers_to_errors(s: &str) -> String {
@@ -1163,7 +1169,7 @@ fn replace_pointers_to_errors(s: &str) -> String {
         }).into_owned()
 }
 
-pub fn generate(pdb_path: &Path) -> Result<()> {
+pub fn generate(pdb_path: &Path, target: &str) -> Result<()> {
     let pdb = File::open(pdb_path)?;
     let mut pdb = pdb::PDB::open(pdb)?;
 
@@ -1180,11 +1186,11 @@ pub fn generate(pdb_path: &Path) -> Result<()> {
 
     let nested_classes = NestedClassesAndUnions::new(&type_finder, &type_information);
     let mut classes_unions_and_enums = decompile_classes_unions_and_enums(
-        "Surface",
+        target,
         &nested_classes,
         &type_finder,
         &type_information,
-    );
+    )?;
     let forward_refrences =
         decompile_forward_refrences(&nested_classes, &type_finder, &type_information);
 

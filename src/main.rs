@@ -103,12 +103,20 @@ fn inject() -> Result<()> {
 }
 
 fn main() -> Result<()> {
-    if std::env::args().any(|x| x == *"bindings") {
-        let pdb_path = factorio_path("factorio.pdb")?;
-        pdb2hpp::generate(&pdb_path)?;
+    let mut args = std::env::args().skip(1);
+    if let Some(arg) = args.next() {
+        if arg == "bindings" {
+            let pdb_path = factorio_path("factorio.pdb")?;
+            let target = args
+                .next()
+                .ok_or_else(|| anyhow!("Usage: rivets bindings <decompilation target>"))?;
+            pdb2hpp::generate(&pdb_path, &target)?;
+            Ok(())
+        } else {
+            bail!("Unknown command: {arg}");
+        }
     } else {
         inject()?;
+        Ok(())
     }
-
-    Ok(())
 }
