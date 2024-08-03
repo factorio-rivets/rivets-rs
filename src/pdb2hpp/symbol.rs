@@ -23,12 +23,14 @@ pub struct Symbol {
 
 impl Display for Symbol {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s: &str = match &self.name {
-            Type::Symbol(s, _) => s,
-            Type::String(s) => s,
-            Type::None => NONETYPE_ERROR,
-        };
-        write!(f, "{}", s)
+        write!(
+            f,
+            "{}",
+            match &self.name {
+                Type::String(s) | Type::Symbol(s, _) => s,
+                Type::None => NONETYPE_ERROR,
+            }
+        )
     }
 }
 
@@ -180,7 +182,9 @@ impl Symbol {
         for char in type_name.chars().skip(type_name.find("::").unwrap_or(0)) {
             match char {
                 '<' | '(' => {
-                    if template_depth != 0 {current.push(char);}
+                    if template_depth != 0 {
+                        current.push(char);
+                    }
                     template_depth += 1;
                 }
                 '>' | ')' => {
@@ -188,14 +192,18 @@ impl Symbol {
                     if template_depth < 0 {
                         template_depth = 0;
                     }
-                    if template_depth != 0 {current.push(char);}
+                    if template_depth != 0 {
+                        current.push(char);
+                    }
                 }
                 ',' if template_depth == 1 => {
                     result.push(current.trim().to_string());
                     current.clear();
                 }
                 _ => {
-                    if template_depth != 0 {current.push(char);}
+                    if template_depth != 0 {
+                        current.push(char);
+                    }
                 }
             }
         }
@@ -380,7 +388,10 @@ mod tests {
             vec!["my_namespace".to_string(), "MyClass".to_string()]
         );
         assert_eq!(symbol.to_string(), "my_namespace::MyClass".to_string());
-        assert_eq!(symbol.fully_qualifed(), "my_namespace<int, std::string, 10.5>::MyClass");
+        assert_eq!(
+            symbol.fully_qualifed(),
+            "my_namespace<int, std::string, 10.5>::MyClass"
+        );
         assert_eq!(symbol.templates_by_type().len(), 0);
     }
 }

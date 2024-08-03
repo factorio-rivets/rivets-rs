@@ -388,16 +388,19 @@ impl<'a> DecompilationResult<'a> {
                 let mut base_classes = dc.base_classes;
                 let mut type_name = dc.name;
 
-                if let Some(nested_class) = self.nested_classes.find(&type_name) {
-                    type_name = nested_class.name;
+                if let Some(nested_class_repersentation) = unsafe { self.nested_classes.find(&type_name) } {
                     self.drain_base_classes_inner(base_classes.get_mut());
+                    format!(
+                        "/* offset {offset:3} */ {} {field_name}{}",
+                        nested_class_repersentation, dc.name_suffix
+                    )
+                } else {
+                    format!(
+                        "/* offset {offset:3} */ {} {field_name}{}",
+                        type_name.fully_qualifed(),
+                        dc.name_suffix
+                    )
                 }
-
-                format!(
-                    "/* offset {offset:3} */ {} {field_name}{}",
-                    type_name.fully_qualifed(),
-                    dc.name_suffix
-                )
             }
             Some(pdb::TypeData::StaticMember(data)) => {
                 let dc = DecompilationResult::from_index(
@@ -434,7 +437,6 @@ impl<'a> DecompilationResult<'a> {
             Some(pdb::TypeData::Class(data)) => {
                 // A class type in c++
                 // TODO handle data.properties
-                println!("class: {}", data.name);
                 self.class_to_string()
             }
             Some(pdb::TypeData::FieldList(data)) => {
@@ -981,8 +983,16 @@ impl<'a> NestedClassesAndUnions<'a> {
 
             let name = Symbol::new(
                 match &data {
-                    pdb::TypeData::Class(data) if data.properties.is_nested_type() => data.name,
-                    pdb::TypeData::Union(data) if data.properties.is_nested_type() => data.name,
+                    pdb::TypeData::Class(data)
+                        if data.properties.is_nested_type() && data.properties.packed() =>
+                    {
+                        data.name
+                    }
+                    pdb::TypeData::Union(data)
+                        if data.properties.is_nested_type() && data.properties.packed() =>
+                    {
+                        data.name
+                    }
                     _ => return Ok(()),
                 }
                 .to_string()
@@ -1000,14 +1010,14 @@ impl<'a> NestedClassesAndUnions<'a> {
         }
     }
 
-    fn find(&self, name: &Symbol) -> Option<DecompilationResult<'_>> {
+    /// WARNING: this function is prone to stack overflows via infinite recursion
+    /// todo: fix
+    unsafe fn find(&self, name: &Symbol) -> Option<String> {
         let data = self.by_data.get(&name.to_string())?;
-        Some(DecompilationResult::from_data(
-            self,
-            None,
-            self.type_finder,
-            data.clone(),
-        ))
+        Some(
+            DecompilationResult::from_data(self, None, self.type_finder, data.clone())
+                .repersentation,
+        )
     }
 }
 
