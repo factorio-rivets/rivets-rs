@@ -411,7 +411,7 @@ impl<'a> DecompilationResult<'a> {
                     type_finder,
                     data.field_type,
                 );
-                format!("static {}", dc.repersentation)
+                format!("/* static member */ static {} staticVar", dc.name)
             }
             Some(pdb::TypeData::BaseClass(data)) => {
                 let attributes = FieldAttributes {
