@@ -187,7 +187,7 @@ struct DecompilationResult<'a> {
     /// This is necessary in case a class has an internal lambda union or struct.
     nested_classes: &'a NestedClassesAndUnions<'a>,
     /// An interior-mutable set of all the base classes that this class inherits from.
-    base_classes: RefCell<HashSet<String>>,
+    base_classes: RefCell<HashMap<String, String>>,
     /// Used for array sizes. This data must be specfied after a type's name. ie `int my_int[4]` not `int[4] my_int`
     name_suffix: String,
 }
@@ -245,7 +245,7 @@ impl<'a> DecompilationResult<'a> {
             name: Symbol::none(),
             data: Some(data),
             type_finder,
-            base_classes: RefCell::new(HashSet::new()),
+            base_classes: RefCell::new(HashMap::new()),
             name_suffix: String::new(),
         };
 
@@ -273,7 +273,7 @@ impl<'a> DecompilationResult<'a> {
                 name: Symbol::none(),
                 data: None,
                 type_finder,
-                base_classes: RefCell::new(HashSet::new()),
+                base_classes: RefCell::new(HashMap::new()),
                 name_suffix: String::new(),
             },
         }
@@ -428,7 +428,7 @@ impl<'a> DecompilationResult<'a> {
 
                 self.base_classes
                     .get_mut()
-                    .insert(format!("{attributes}{}", dc.name));
+                    .insert(dc.name.to_string(), attributes);
 
                 format!(
                     "/* offset {:4} */ /* fields for {} */",
@@ -751,9 +751,9 @@ impl<'a> DecompilationResult<'a> {
         }
 
         let mut base_classes = String::new();
-        for (i, base) in self.base_classes.borrow().iter().enumerate() {
+        for (i, (base, attributes)) in self.base_classes.borrow().iter().enumerate() {
             let prefix = if i == 0 { ':' } else { ',' };
-            base_classes.push_str(&format!("{prefix} {base}"));
+            base_classes.push_str(&format!("{prefix} {attributes}{base}"));
         }
 
         let mut fields = do_indent(&fields.join("\n"));
@@ -769,7 +769,7 @@ impl<'a> DecompilationResult<'a> {
         self.drain_base_classes_inner(&mut other.base_classes.borrow_mut());
     }
 
-    fn drain_base_classes_inner(&self, base_classes: &mut HashSet<String>) {
+    fn drain_base_classes_inner(&self, base_classes: &mut HashMap<String, String>) {
         self.base_classes.borrow_mut().extend(base_classes.drain());
     }
 
@@ -1084,8 +1084,6 @@ fn decompile_classes_unions_and_enums<'a>(
     type_finder: &'a pdb::TypeFinder<'_>,
     type_information: &pdb::TypeInformation,
 ) -> Result<String> {
-    // this is a hashmap becuase enums in the factorio pdb seem to exist multiple times with the same name.
-    // we are taking only the most recent occurance.
     let mut classes_and_unions: Vec<DecompilationResult> = Vec::new();
     let mut found_any = false;
 
@@ -1149,15 +1147,43 @@ fn decompile_classes_unions_and_enums<'a>(
         bail!("Could not find any classes, unions, or enums with the name {target}");
     }
 
+    let mut base_classes =  HashSet::new();
+    for dc in &classes_and_unions {
+        for base_class in dc.base_classes.borrow().keys() {
+            base_classes.insert(base_class.clone());
+        }
+    }
+
+    let mut base_class_string = String::new();
+    if !base_classes.is_empty() {
+        for base_class in base_classes {
+            println!("Discovered class inheritance: {base_class}");
+            println!("\tDecompiling base class...");
+            base_class_string.push_str(&match decompile_classes_unions_and_enums(
+                &base_class,
+                nested_classes,
+                type_finder,
+                type_information,
+            ) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("Error: decompiling base class {base_class}. {e}");
+                    continue;
+                }
+            });
+            base_class_string.push('\n');
+            base_class_string.push('\n');
+        }
+    }
+
     let mut classes_and_unions: Vec<String> = classes_and_unions
         .into_iter()
         .map(|dc| dc.namespaced_repersentation())
         .collect();
     classes_and_unions.sort();
 
-    let mut classes_and_unions = classes_and_unions.join("\n");
-    classes_and_unions.push('\n');
-    Ok(classes_and_unions)
+    let classes_and_unions = classes_and_unions.join("\n");
+    Ok(format!("{base_class_string}{classes_and_unions}\n"))
 }
 
 fn replace_pointers_to_errors(s: &str) -> String {
