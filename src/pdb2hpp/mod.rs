@@ -1238,14 +1238,14 @@ pub fn generate(pdb_path: &Path, target: &str) -> Result<()> {
         elapsed.as_secs_f64()
     );
 
-    println!("Using bindgen to generate structs.rs");
+    /*println!("Using bindgen to generate structs.rs");
     let bindings = bindgen::Builder::default()
         .header_contents("structs.hpp", &header_file)
         .rust_target(bindgen::RustTarget::Nightly)
         .generate()?;
 
     println!("Bindgen generation succeeded. Writing rust bindings to structs.rs");
-    bindings.write_to_file("./src/structs.rs")?;
+    bindings.write_to_file("./src/structs.rs")?;*/
 
     Ok(())
 }

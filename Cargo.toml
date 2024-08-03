@@ -15,7 +15,6 @@ windows = { version = "0.58.0", features = [
 pdb = "0.8.0"
 anyhow = "1.0.86"
 getopts = "0.2.21"
-bindgen = "0.69.4"
 indicatif = "0.17.8"
 regex = "1.10.5"
 lazy-regex = "3.1.0"
