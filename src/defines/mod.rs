@@ -315,7 +315,7 @@ impl crate::defines::Defines<u8> for direction {
     }
 }
 
-pub mod riding {    
+pub mod riding {
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum acceleration {
         nothing,
@@ -349,7 +349,6 @@ pub mod riding {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum direction {
         left,
@@ -379,7 +378,8 @@ pub mod riding {
             ]
         }
     }
-    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum shooting {
     not_shooting,
@@ -558,7 +558,7 @@ impl crate::defines::Defines<u8> for difficulty {
     }
 }
 
-pub mod difficulty_settings {    
+pub mod difficulty_settings {
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum recipe_difficulty {
         normal,
@@ -584,7 +584,6 @@ pub mod difficulty_settings {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum technology_difficulty {
         normal,
@@ -610,7 +609,8 @@ pub mod difficulty_settings {
             ]
         }
     }
-    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum events {
     on_player_input_method_changed,
@@ -1839,8 +1839,8 @@ impl crate::defines::Defines<u8> for rail_connection_direction {
     }
 }
 
-pub mod control_behavior {    
-    pub mod inserter {    
+pub mod control_behavior {
+    pub mod inserter {
         #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
         pub enum circuit_mode_of_operation {
             none,
@@ -1878,7 +1878,6 @@ pub mod control_behavior {
                 ]
             }
         }
-        
         #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
         pub enum hand_read_mode {
             hold,
@@ -1904,8 +1903,8 @@ pub mod control_behavior {
                 ]
             }
         }
-        }
-    pub mod logistic_container {    
+    }
+    pub mod logistic_container {
         #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
         pub enum circuit_mode_of_operation {
             send_contents,
@@ -1931,8 +1930,8 @@ pub mod control_behavior {
                 ]
             }
         }
-        }
-    pub mod lamp {    
+    }
+    pub mod lamp {
         #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
         pub enum circuit_mode_of_operation {
             use_colors,
@@ -1954,8 +1953,8 @@ pub mod control_behavior {
                 ]
             }
         }
-        }
-    pub mod mining_drill {    
+    }
+    pub mod mining_drill {
         #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
         pub enum resource_read_mode {
             this_miner,
@@ -1981,8 +1980,8 @@ pub mod control_behavior {
                 ]
             }
         }
-        }
-    pub mod transport_belt {    
+    }
+    pub mod transport_belt {
         #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
         pub enum content_read_mode {
             pulse,
@@ -2008,7 +2007,7 @@ pub mod control_behavior {
                 ]
             }
         }
-        }
+    }
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum r#type {
         container,
@@ -2098,7 +2097,8 @@ pub mod control_behavior {
             ]
         }
     }
-    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum chunk_generated_status {
     nothing,
@@ -2225,7 +2225,7 @@ impl crate::defines::Defines<u8> for logistic_member_index {
     }
 }
 
-pub mod deconstruction_item {    
+pub mod deconstruction_item {
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum entity_filter_mode {
         whitelist,
@@ -2251,7 +2251,6 @@ pub mod deconstruction_item {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum tile_filter_mode {
         whitelist,
@@ -2277,7 +2276,6 @@ pub mod deconstruction_item {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum tile_selection_mode {
         normal,
@@ -2311,7 +2309,8 @@ pub mod deconstruction_item {
             ]
         }
     }
-    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum alert_type {
     entity_destroyed,
@@ -4212,7 +4211,7 @@ impl crate::defines::Defines<u8> for disconnect_reason {
     }
 }
 
-pub mod prototypes {    
+pub mod prototypes {
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum achievement {
         achievement,
@@ -4298,7 +4297,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum ambient_sound {
         ambient_sound,
@@ -4320,7 +4318,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum ammo_category {
         ammo_category,
@@ -4342,7 +4339,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum animation {
         animation,
@@ -4364,7 +4360,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum autoplace_control {
         autoplace_control,
@@ -4386,7 +4381,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum custom_input {
         custom_input,
@@ -4408,7 +4402,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum damage_type {
         damage_type,
@@ -4430,7 +4423,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum decorative {
         optimized_decorative,
@@ -4452,7 +4444,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum editor_controller {
         editor_controller,
@@ -4474,7 +4465,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum entity {
         accumulator,
@@ -4908,7 +4898,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum equipment {
         active_defense_equipment,
@@ -4962,7 +4951,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum equipment_category {
         equipment_category,
@@ -4984,7 +4972,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum equipment_grid {
         equipment_grid,
@@ -5006,7 +4993,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum fluid {
         fluid,
@@ -5028,7 +5014,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum font {
         font,
@@ -5050,7 +5035,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum fuel_category {
         fuel_category,
@@ -5072,7 +5056,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum god_controller {
         god_controller,
@@ -5094,7 +5077,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum gui_style {
         gui_style,
@@ -5116,7 +5098,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum item {
         ammo,
@@ -5218,7 +5199,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum item_group {
         item_group,
@@ -5240,7 +5220,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum item_subgroup {
         item_subgroup,
@@ -5262,7 +5241,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum map_gen_presets {
         map_gen_presets,
@@ -5284,7 +5262,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum map_settings {
         map_settings,
@@ -5306,7 +5283,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum module_category {
         module_category,
@@ -5328,7 +5304,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum mouse_cursor {
         mouse_cursor,
@@ -5350,7 +5325,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum noise_expression {
         noise_expression,
@@ -5372,7 +5346,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum noise_layer {
         noise_layer,
@@ -5394,7 +5367,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum particle {
         optimized_particle,
@@ -5416,7 +5388,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum recipe {
         recipe,
@@ -5438,7 +5409,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum recipe_category {
         recipe_category,
@@ -5460,7 +5430,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum resource_category {
         resource_category,
@@ -5482,7 +5451,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum shortcut {
         shortcut,
@@ -5504,7 +5472,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum sound {
         sound,
@@ -5526,7 +5493,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum spectator_controller {
         spectator_controller,
@@ -5548,7 +5514,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum sprite {
         sprite,
@@ -5570,7 +5535,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum technology {
         technology,
@@ -5592,7 +5556,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum tile {
         tile,
@@ -5614,7 +5577,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum tile_effect {
         tile_effect,
@@ -5636,7 +5598,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum tips_and_tricks_item {
         tips_and_tricks_item,
@@ -5658,7 +5619,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum tips_and_tricks_item_category {
         tips_and_tricks_item_category,
@@ -5680,7 +5640,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum trigger_target_type {
         trigger_target_type,
@@ -5702,7 +5661,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum trivial_smoke {
         trivial_smoke,
@@ -5724,7 +5682,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum tutorial {
         tutorial,
@@ -5746,7 +5703,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum utility_constants {
         utility_constants,
@@ -5768,7 +5724,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum utility_sounds {
         utility_sounds,
@@ -5790,7 +5745,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum utility_sprites {
         utility_sprites,
@@ -5812,7 +5766,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum virtual_signal {
         virtual_signal,
@@ -5834,7 +5787,6 @@ pub mod prototypes {
             ]
         }
     }
-    
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
     pub enum wind_sound {
         wind_sound,
@@ -5856,7 +5808,8 @@ pub mod prototypes {
             ]
         }
     }
-    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum print_sound {
     always,

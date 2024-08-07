@@ -68,7 +68,7 @@ local function get_impl(T, name, value_function, key_function, iter_function)
 end
 
 local function do_indent(structure)
-    return '    ' .. structure:gsub('\n', '\n    ')
+    return structure:gsub('\n', '\n    ')
 end
 
 local function convert_to_valid_rust_identifier(token)
@@ -85,7 +85,7 @@ local function convert_to_rust(name, table)
         for k, v in pairs(table) do
             module = module .. '\n' .. convert_to_rust(k, v)
         end
-        return 'pub mod ' .. name .. ' {' .. do_indent(module) .. '}'
+        return 'pub mod ' .. name .. ' {' .. do_indent(module) .. '\n}'
     end
 
     name = convert_to_valid_rust_identifier(name)
@@ -108,7 +108,7 @@ local function convert_to_rust(name, table)
         iter_function = iter_function .. '            Self::' .. enum_key .. ',\n'
     end
     
-    return enum .. '}\n' .. get_impl(T, name, value_function, key_function, iter_function) .. '\n'
+    return enum .. '}\n' .. get_impl(T, name, value_function, key_function, iter_function)
 end
 
 local function get_defines_trait()
@@ -124,11 +124,12 @@ local attributes = {
     '#![allow(clippy::enum_variant_names)]',
     '#![allow(clippy::too_many_lines)]',
     '#![allow(clippy::match_same_arms)]',
+    '#![allow(non_camel_case_types)]',
 }
 
 local rust = table.concat(attributes, '\n') .. '\n\n' .. get_defines_trait() .. '\n'
 for k, v in pairs(defines) do
-    rust = rust .. convert_to_rust(k, v) .. '\n'
+    rust = rust .. convert_to_rust(k, v) .. '\n\n'
 end
 
 log('\n\nSTARTING POINT\n' .. rust)
