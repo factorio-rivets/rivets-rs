@@ -1,4 +1,7 @@
-function string_split(inputstr, sep)
+_ = 'This file automatically generates rust bindings for the defines table'
+_ = 'Run this inside factorio as a /c command'
+
+local function string_split(inputstr, sep)
     if sep == nil then
         sep = '%s'
     end
@@ -61,7 +64,7 @@ end
 
 local function get_impl(T, name, deref_function, key_function, iter_function)
     local impl = 'impl std::ops::Deref for ' .. name .. ' {\n    type Target = ' .. (T == '&\'static str' and 'str' or T) .. ';\n'
-    impl = impl .. deref_function
+    impl = impl .. deref_function .. '        }\n' .. '    }\n'
     impl = impl .. '}\n'
     impl = impl .. 'impl crate::defines::Defines<' .. T .. '> for ' .. name .. ' {\n'
     impl = impl .. key_function .. '        }\n    }\n'
@@ -94,12 +97,8 @@ local function convert_to_rust(name, table)
     local derives = '#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]\n'
     local enum = derives .. 'pub enum ' .. name .. ' {\n'
     local T = figure_out_enum_return_type(table)
-    local deref_function
-    if T == '&\'static str' then
-        deref_function = '    fn deref(&self) -> &\'static str {\n' .. '        match self {\n'
-    else
-        deref_function = '    fn deref(&self) -> &\'static ' .. T .. ' {\n' .. '        const VALUES: [' .. T .. '; ' .. table_size(table) .. '] = [\n'
-    end
+    local lifetime = T == '&\'static str' and ' ' or '&\'static '
+    local deref_function = '    fn deref(&self) -> ' .. lifetime .. T .. ' {\n' .. '        match self {\n'
     local key_function = '    fn key(&self) -> &\'static str {\n' .. '        match self {\n'
     local iter_function = '    fn iter() -> &\'static [Self] {\n' .. '        &[\n'
     for k, repersentation in pairs(table) do
@@ -110,21 +109,13 @@ local function convert_to_rust(name, table)
             repersentation = '"' .. repersentation .. '"'
         end
         enum = enum .. '    ' .. enum_key .. ',\n'
-        if T == '&\'static str' then
-            deref_function = deref_function .. '            Self::' .. enum_key .. ' => ' .. repersentation .. ',\n'
-        else
-            deref_function = deref_function .. '            ' .. repersentation .. ', // ' .. k .. '\n'
-        end
+
+        local borrow = (T == '&\'static str' and '' or '&')
+        deref_function = deref_function .. '            Self::' .. enum_key .. ' => ' .. borrow .. repersentation .. ',\n'
         key_function = key_function .. '            Self::' .. enum_key .. ' => "' .. k .. '",\n'
         iter_function = iter_function .. '            Self::' .. enum_key .. ',\n'
     end
 
-    if T == '&\'static str' then
-        deref_function = deref_function .. '        }\n' .. '    }\n'
-    else
-        deref_function = deref_function .. '        ];\n        &VALUES[*self as usize]\n' .. '    }\n'
-    end
-    
     return enum .. '}\n' .. get_impl(T, name, deref_function, key_function, iter_function)
 end
 
