@@ -59,9 +59,11 @@ local function figure_out_enum_return_type(table)
     end
 end
 
-local function get_impl(T, name, value_function, key_function, iter_function)
-    local impl = 'impl crate::defines::Defines<' .. T .. '> for ' .. name .. ' {\n'
-    impl = impl .. value_function .. '        }\n    }\n'
+local function get_impl(T, name, deref_function, key_function, iter_function)
+    local impl = 'impl std::ops::Deref for ' .. name .. ' {\n    type Target = ' .. (T == '&\'static str' and 'str' or T) .. ';\n'
+    impl = impl .. deref_function
+    impl = impl .. '}\n'
+    impl = impl .. 'impl crate::defines::Defines<' .. T .. '> for ' .. name .. ' {\n'
     impl = impl .. key_function .. '        }\n    }\n'
     impl = impl .. iter_function .. '        ]\n    }\n'
     return impl .. '}'
@@ -92,7 +94,12 @@ local function convert_to_rust(name, table)
     local derives = '#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]\n'
     local enum = derives .. 'pub enum ' .. name .. ' {\n'
     local T = figure_out_enum_return_type(table)
-    local value_function = '    fn value(&self) -> ' .. T .. ' {\n' .. '        match self {\n'
+    local deref_function
+    if T == '&\'static str' then
+        deref_function = '    fn deref(&self) -> &\'static str {\n' .. '        match self {\n'
+    else
+        deref_function = '    fn deref(&self) -> &\'static ' .. T .. ' {\n' .. '        const VALUES: [' .. T .. '; ' .. table_size(table) .. '] = [\n'
+    end
     local key_function = '    fn key(&self) -> &\'static str {\n' .. '        match self {\n'
     local iter_function = '    fn iter() -> &\'static [Self] {\n' .. '        &[\n'
     for k, repersentation in pairs(table) do
@@ -103,17 +110,26 @@ local function convert_to_rust(name, table)
             repersentation = '"' .. repersentation .. '"'
         end
         enum = enum .. '    ' .. enum_key .. ',\n'
-        value_function = value_function .. '            Self::' .. enum_key .. ' => ' .. repersentation .. ',\n'
+        if T == '&\'static str' then
+            deref_function = deref_function .. '            Self::' .. enum_key .. ' => ' .. repersentation .. ',\n'
+        else
+            deref_function = deref_function .. '            ' .. repersentation .. ', // ' .. k .. '\n'
+        end
         key_function = key_function .. '            Self::' .. enum_key .. ' => "' .. k .. '",\n'
         iter_function = iter_function .. '            Self::' .. enum_key .. ',\n'
     end
+
+    if T == '&\'static str' then
+        deref_function = deref_function .. '        }\n' .. '    }\n'
+    else
+        deref_function = deref_function .. '        ];\n        &VALUES[*self as usize]\n' .. '    }\n'
+    end
     
-    return enum .. '}\n' .. get_impl(T, name, value_function, key_function, iter_function)
+    return enum .. '}\n' .. get_impl(T, name, deref_function, key_function, iter_function)
 end
 
 local function get_defines_trait()
-    local trait = 'pub trait Defines<T> {\n'
-    trait = trait .. '    fn value(&self) -> T;\n'
+    local trait = 'pub trait Defines<T>: std::ops::Deref {\n'
     trait = trait .. '    fn key(&self) -> &\'static str;\n'
     trait = trait .. '    fn iter() -> &\'static [Self] where Self: std::marker::Sized;\n'
     trait = trait .. '}\n'

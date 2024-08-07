@@ -3,8 +3,7 @@
 #![allow(clippy::match_same_arms)]
 #![allow(non_camel_case_types)]
 
-pub trait Defines<T> {
-    fn value(&self) -> T;
+pub trait Defines<T>: std::ops::Deref {
     fn key(&self) -> &'static str;
     fn iter() -> &'static [Self] where Self: std::marker::Sized;
 }
@@ -57,56 +56,60 @@ pub enum inventory {
     spider_ammo,
     spider_trash,
 }
-impl crate::defines::Defines<u8> for inventory {
-    fn value(&self) -> u8 {
-        match self {
-            Self::fuel => 1,
-            Self::burnt_result => 6,
-            Self::chest => 1,
-            Self::furnace_source => 2,
-            Self::furnace_result => 3,
-            Self::furnace_modules => 4,
-            Self::character_main => 1,
-            Self::character_guns => 3,
-            Self::character_ammo => 4,
-            Self::character_armor => 5,
-            Self::character_vehicle => 7,
-            Self::character_trash => 8,
-            Self::god_main => 2,
-            Self::editor_main => 1,
-            Self::editor_guns => 3,
-            Self::editor_ammo => 4,
-            Self::editor_armor => 5,
-            Self::roboport_robot => 1,
-            Self::roboport_material => 2,
-            Self::robot_cargo => 1,
-            Self::robot_repair => 2,
-            Self::assembling_machine_input => 2,
-            Self::assembling_machine_output => 3,
-            Self::assembling_machine_modules => 4,
-            Self::lab_input => 2,
-            Self::lab_modules => 3,
-            Self::mining_drill_modules => 2,
-            Self::item_main => 1,
-            Self::rocket_silo_rocket => 5,
-            Self::rocket_silo_result => 6,
-            Self::rocket_silo_input => 2,
-            Self::rocket_silo_output => 3,
-            Self::rocket_silo_modules => 4,
-            Self::rocket => 1,
-            Self::car_trunk => 2,
-            Self::car_ammo => 3,
-            Self::cargo_wagon => 1,
-            Self::turret_ammo => 1,
-            Self::beacon_modules => 1,
-            Self::character_corpse => 1,
-            Self::artillery_turret_ammo => 1,
-            Self::artillery_wagon_ammo => 1,
-            Self::spider_trunk => 2,
-            Self::spider_ammo => 3,
-            Self::spider_trash => 4,
-        }
+impl std::ops::Deref for inventory {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 45] = [
+            1, // fuel
+            6, // burnt_result
+            1, // chest
+            2, // furnace_source
+            3, // furnace_result
+            4, // furnace_modules
+            1, // character_main
+            3, // character_guns
+            4, // character_ammo
+            5, // character_armor
+            7, // character_vehicle
+            8, // character_trash
+            2, // god_main
+            1, // editor_main
+            3, // editor_guns
+            4, // editor_ammo
+            5, // editor_armor
+            1, // roboport_robot
+            2, // roboport_material
+            1, // robot_cargo
+            2, // robot_repair
+            2, // assembling_machine_input
+            3, // assembling_machine_output
+            4, // assembling_machine_modules
+            2, // lab_input
+            3, // lab_modules
+            2, // mining_drill_modules
+            1, // item_main
+            5, // rocket_silo_rocket
+            6, // rocket_silo_result
+            2, // rocket_silo_input
+            3, // rocket_silo_output
+            4, // rocket_silo_modules
+            1, // rocket
+            2, // car_trunk
+            3, // car_ammo
+            1, // cargo_wagon
+            1, // turret_ammo
+            1, // beacon_modules
+            1, // character_corpse
+            1, // artillery_turret_ammo
+            1, // artillery_wagon_ammo
+            2, // spider_trunk
+            3, // spider_ammo
+            4, // spider_trash
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for inventory {
     fn key(&self) -> &'static str {
         match self {
             Self::fuel => "fuel",
@@ -220,21 +223,25 @@ pub enum transport_line {
     secondary_left_split_line,
     secondary_right_split_line,
 }
-impl crate::defines::Defines<u8> for transport_line {
-    fn value(&self) -> u8 {
-        match self {
-            Self::left_line => 1,
-            Self::right_line => 2,
-            Self::left_underground_line => 3,
-            Self::right_underground_line => 4,
-            Self::secondary_left_line => 3,
-            Self::secondary_right_line => 4,
-            Self::left_split_line => 5,
-            Self::right_split_line => 6,
-            Self::secondary_left_split_line => 7,
-            Self::secondary_right_split_line => 8,
-        }
+impl std::ops::Deref for transport_line {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 10] = [
+            1, // left_line
+            2, // right_line
+            3, // left_underground_line
+            4, // right_underground_line
+            3, // secondary_left_line
+            4, // secondary_right_line
+            5, // left_split_line
+            6, // right_split_line
+            7, // secondary_left_split_line
+            8, // secondary_right_split_line
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for transport_line {
     fn key(&self) -> &'static str {
         match self {
             Self::left_line => "left_line",
@@ -276,19 +283,23 @@ pub enum direction {
     west,
     northwest,
 }
-impl crate::defines::Defines<u8> for direction {
-    fn value(&self) -> u8 {
-        match self {
-            Self::north => 0,
-            Self::northeast => 1,
-            Self::east => 2,
-            Self::southeast => 3,
-            Self::south => 4,
-            Self::southwest => 5,
-            Self::west => 6,
-            Self::northwest => 7,
-        }
+impl std::ops::Deref for direction {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 8] = [
+            0, // north
+            1, // northeast
+            2, // east
+            3, // southeast
+            4, // south
+            5, // southwest
+            6, // west
+            7, // northwest
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for direction {
     fn key(&self) -> &'static str {
         match self {
             Self::north => "north",
@@ -323,15 +334,19 @@ pub mod riding {
         braking,
         reversing,
     }
-    impl crate::defines::Defines<u8> for acceleration {
-        fn value(&self) -> u8 {
-            match self {
-                Self::nothing => 0,
-                Self::accelerating => 1,
-                Self::braking => 2,
-                Self::reversing => 3,
-            }
+    impl std::ops::Deref for acceleration {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 4] = [
+                0, // nothing
+                1, // accelerating
+                2, // braking
+                3, // reversing
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for acceleration {
         fn key(&self) -> &'static str {
             match self {
                 Self::nothing => "nothing",
@@ -355,14 +370,18 @@ pub mod riding {
         straight,
         right,
     }
-    impl crate::defines::Defines<u8> for direction {
-        fn value(&self) -> u8 {
-            match self {
-                Self::left => 0,
-                Self::straight => 1,
-                Self::right => 2,
-            }
+    impl std::ops::Deref for direction {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 3] = [
+                0, // left
+                1, // straight
+                2, // right
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for direction {
         fn key(&self) -> &'static str {
             match self {
                 Self::left => "left",
@@ -386,14 +405,18 @@ pub enum shooting {
     shooting_enemies,
     shooting_selected,
 }
-impl crate::defines::Defines<u8> for shooting {
-    fn value(&self) -> u8 {
-        match self {
-            Self::not_shooting => 0,
-            Self::shooting_enemies => 1,
-            Self::shooting_selected => 2,
-        }
+impl std::ops::Deref for shooting {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 3] = [
+            0, // not_shooting
+            1, // shooting_enemies
+            2, // shooting_selected
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for shooting {
     fn key(&self) -> &'static str {
         match self {
             Self::not_shooting => "not_shooting",
@@ -422,20 +445,24 @@ pub enum command {
     stop,
     build_base,
 }
-impl crate::defines::Defines<u8> for command {
-    fn value(&self) -> u8 {
-        match self {
-            Self::attack => 1,
-            Self::go_to_location => 2,
-            Self::compound => 3,
-            Self::group => 4,
-            Self::attack_area => 5,
-            Self::wander => 6,
-            Self::flee => 8,
-            Self::stop => 9,
-            Self::build_base => 7,
-        }
+impl std::ops::Deref for command {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 9] = [
+            1, // attack
+            2, // go_to_location
+            3, // compound
+            4, // group
+            5, // attack_area
+            6, // wander
+            8, // flee
+            9, // stop
+            7, // build_base
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for command {
     fn key(&self) -> &'static str {
         match self {
             Self::attack => "attack",
@@ -471,15 +498,19 @@ pub enum distraction {
     by_anything,
     by_damage,
 }
-impl crate::defines::Defines<u8> for distraction {
-    fn value(&self) -> u8 {
-        match self {
-            Self::none => 0,
-            Self::by_enemy => 1,
-            Self::by_anything => 3,
-            Self::by_damage => 4,
-        }
+impl std::ops::Deref for distraction {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 4] = [
+            0, // none
+            1, // by_enemy
+            3, // by_anything
+            4, // by_damage
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for distraction {
     fn key(&self) -> &'static str {
         match self {
             Self::none => "none",
@@ -504,14 +535,18 @@ pub enum compound_command {
     logical_or,
     return_last,
 }
-impl crate::defines::Defines<u8> for compound_command {
-    fn value(&self) -> u8 {
-        match self {
-            Self::logical_and => 0,
-            Self::logical_or => 1,
-            Self::return_last => 2,
-        }
+impl std::ops::Deref for compound_command {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 3] = [
+            0, // logical_and
+            1, // logical_or
+            2, // return_last
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for compound_command {
     fn key(&self) -> &'static str {
         match self {
             Self::logical_and => "logical_and",
@@ -534,14 +569,18 @@ pub enum difficulty {
     normal,
     hard,
 }
-impl crate::defines::Defines<u8> for difficulty {
-    fn value(&self) -> u8 {
-        match self {
-            Self::easy => 0,
-            Self::normal => 1,
-            Self::hard => 2,
-        }
+impl std::ops::Deref for difficulty {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 3] = [
+            0, // easy
+            1, // normal
+            2, // hard
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for difficulty {
     fn key(&self) -> &'static str {
         match self {
             Self::easy => "easy",
@@ -564,13 +603,17 @@ pub mod difficulty_settings {
         normal,
         expensive,
     }
-    impl crate::defines::Defines<u8> for recipe_difficulty {
-        fn value(&self) -> u8 {
-            match self {
-                Self::normal => 0,
-                Self::expensive => 1,
-            }
+    impl std::ops::Deref for recipe_difficulty {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 2] = [
+                0, // normal
+                1, // expensive
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for recipe_difficulty {
         fn key(&self) -> &'static str {
             match self {
                 Self::normal => "normal",
@@ -589,13 +632,17 @@ pub mod difficulty_settings {
         normal,
         expensive,
     }
-    impl crate::defines::Defines<u8> for technology_difficulty {
-        fn value(&self) -> u8 {
-            match self {
-                Self::normal => 0,
-                Self::expensive => 1,
-            }
+    impl std::ops::Deref for technology_difficulty {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 2] = [
+                0, // normal
+                1, // expensive
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for technology_difficulty {
         fn key(&self) -> &'static str {
             match self {
                 Self::normal => "normal",
@@ -798,195 +845,199 @@ pub enum events {
     on_gui_click,
     on_tick,
 }
-impl crate::defines::Defines<u8> for events {
-    fn value(&self) -> u8 {
-        match self {
-            Self::on_player_input_method_changed => 183,
-            Self::on_cutscene_finished => 182,
-            Self::on_cutscene_started => 181,
-            Self::on_entity_color_changed => 180,
-            Self::on_gui_leave => 179,
-            Self::on_gui_hover => 178,
-            Self::on_player_alt_reverse_selected_area => 177,
-            Self::on_player_reverse_selected_area => 176,
-            Self::on_equipment_removed => 175,
-            Self::on_equipment_inserted => 174,
-            Self::on_entity_logistic_slot_changed => 173,
-            Self::on_spider_command_completed => 172,
-            Self::on_player_used_spider_remote => 171,
-            Self::on_player_configured_spider_remote => 170,
-            Self::on_cutscene_cancelled => 169,
-            Self::on_permission_group_added => 168,
-            Self::on_permission_group_deleted => 167,
-            Self::on_pre_permission_group_deleted => 166,
-            Self::on_permission_string_imported => 165,
-            Self::on_pre_permission_string_imported => 164,
-            Self::on_permission_group_edited => 163,
-            Self::on_player_flushed_fluid => 162,
-            Self::on_player_clicked_gps_tag => 161,
-            Self::on_entity_destroyed => 160,
-            Self::on_script_inventory_resized => 159,
-            Self::on_pre_script_inventory_resized => 158,
-            Self::on_pre_player_toggled_map_editor => 157,
-            Self::on_player_set_quick_bar_slot => 156,
-            Self::on_script_trigger_effect => 155,
-            Self::on_string_translated => 154,
-            Self::on_force_cease_fire_changed => 153,
-            Self::on_force_friends_changed => 152,
-            Self::on_gui_switch_state_changed => 151,
-            Self::on_gui_selected_tab_changed => 150,
-            Self::on_gui_location_changed => 149,
-            Self::on_gui_confirmed => 148,
-            Self::on_chart_tag_removed => 147,
-            Self::on_chart_tag_modified => 146,
-            Self::on_chart_tag_added => 145,
-            Self::on_trigger_fired_artillery => 144,
-            Self::on_build_base_arrived => 143,
-            Self::on_unit_group_finished_gathering => 142,
-            Self::on_unit_removed_from_group => 141,
-            Self::on_unit_added_to_group => 140,
-            Self::on_unit_group_created => 139,
-            Self::on_pre_player_removed => 138,
-            Self::on_entity_spawned => 137,
-            Self::on_post_entity_died => 136,
-            Self::on_robot_exploded_cliff => 135,
-            Self::on_pre_robot_exploded_cliff => 134,
-            Self::on_pre_chunk_deleted => 133,
-            Self::on_player_fast_transferred => 132,
-            Self::on_player_repaired_entity => 131,
-            Self::on_player_toggled_alt_mode => 130,
-            Self::on_surface_renamed => 129,
-            Self::on_surface_imported => 128,
-            Self::on_game_created_from_scenario => 127,
-            Self::on_brush_cloned => 126,
-            Self::on_area_cloned => 125,
-            Self::on_entity_cloned => 124,
-            Self::on_player_toggled_map_editor => 123,
-            Self::on_cancelled_upgrade => 122,
-            Self::on_marked_for_upgrade => 121,
-            Self::on_ai_command_completed => 120,
-            Self::on_script_path_request_finished => 119,
-            Self::on_rocket_launch_ordered => 118,
-            Self::on_player_unbanned => 117,
-            Self::on_player_kicked => 116,
-            Self::on_player_banned => 115,
-            Self::on_train_schedule_changed => 114,
-            Self::on_chunk_deleted => 113,
-            Self::on_pre_surface_cleared => 112,
-            Self::on_surface_cleared => 111,
-            Self::on_pre_player_left_game => 110,
-            Self::on_player_trash_inventory_changed => 109,
-            Self::on_forces_merged => 108,
-            Self::on_land_mine_armed => 107,
-            Self::on_force_reset => 106,
-            Self::on_technology_effects_reset => 105,
-            Self::on_chunk_charted => 104,
-            Self::on_entity_damaged => 103,
-            Self::on_player_cancelled_crafting => 102,
-            Self::on_pre_player_crafted_item => 101,
-            Self::on_player_display_scale_changed => 100,
-            Self::on_player_display_resolution_changed => 99,
-            Self::on_player_pipette => 98,
-            Self::on_pre_ghost_upgraded => 97,
-            Self::on_pre_ghost_deconstructed => 96,
-            Self::on_character_corpse_expired => 95,
-            Self::on_player_cheat_mode_disabled => 94,
-            Self::on_player_cheat_mode_enabled => 93,
-            Self::on_player_unmuted => 92,
-            Self::on_player_muted => 91,
-            Self::on_gui_value_changed => 90,
-            Self::on_gui_closed => 89,
-            Self::on_gui_opened => 88,
-            Self::on_mod_item_opened => 87,
-            Self::on_player_changed_position => 86,
-            Self::on_worker_robot_expired => 85,
-            Self::on_combat_robot_expired => 84,
-            Self::script_raised_set_tiles => 83,
-            Self::script_raised_teleported => 82,
-            Self::script_raised_revive => 81,
-            Self::script_raised_destroy => 80,
-            Self::script_raised_built => 79,
-            Self::on_player_demoted => 78,
-            Self::on_player_promoted => 77,
-            Self::on_player_used_capsule => 76,
-            Self::on_player_removed => 75,
-            Self::on_console_command => 74,
-            Self::on_console_chat => 73,
-            Self::on_player_configured_blueprint => 72,
-            Self::on_player_deconstructed_area => 71,
-            Self::on_player_setup_blueprint => 70,
-            Self::on_gui_elem_changed => 69,
-            Self::on_train_created => 68,
-            Self::on_player_mined_entity => 67,
-            Self::on_robot_mined_entity => 66,
-            Self::on_pre_surface_deleted => 65,
-            Self::on_surface_deleted => 64,
-            Self::on_surface_created => 63,
-            Self::on_difficulty_settings_changed => 62,
-            Self::on_runtime_mod_setting_changed => 61,
-            Self::on_gui_selection_state_changed => 60,
-            Self::on_entity_renamed => 59,
-            Self::on_player_changed_force => 58,
-            Self::on_biter_base_built => 57,
-            Self::on_player_dropped_item => 56,
-            Self::on_market_item_purchased => 55,
-            Self::on_selected_entity_changed => 54,
-            Self::on_player_changed_surface => 53,
-            Self::on_player_alt_selected_area => 52,
-            Self::on_player_selected_area => 51,
-            Self::on_robot_mined_tile => 50,
-            Self::on_robot_built_tile => 49,
-            Self::on_player_mined_tile => 48,
-            Self::on_player_built_tile => 47,
-            Self::on_player_left_game => 46,
-            Self::on_player_joined_game => 45,
-            Self::on_player_respawned => 44,
-            Self::on_player_died => 43,
-            Self::on_pre_player_died => 42,
-            Self::on_player_removed_equipment => 41,
-            Self::on_player_placed_equipment => 40,
-            Self::on_player_gun_inventory_changed => 39,
-            Self::on_player_ammo_inventory_changed => 38,
-            Self::on_player_armor_inventory_changed => 37,
-            Self::on_lua_shortcut => 36,
-            Self::on_cutscene_waypoint_reached => 35,
-            Self::on_player_main_inventory_changed => 34,
-            Self::on_entity_settings_pasted => 33,
-            Self::on_pre_entity_settings_pasted => 32,
-            Self::on_player_cursor_stack_changed => 31,
-            Self::on_forces_merging => 30,
-            Self::on_force_created => 29,
-            Self::on_player_driving_changed_state => 28,
-            Self::on_resource_depleted => 27,
-            Self::on_player_created => 26,
-            Self::on_train_changed_state => 25,
-            Self::on_trigger_created_entity => 24,
-            Self::on_cancelled_deconstruction => 23,
-            Self::on_marked_for_deconstruction => 22,
-            Self::on_player_rotated_entity => 21,
-            Self::on_research_cancelled => 20,
-            Self::on_research_reversed => 19,
-            Self::on_research_finished => 18,
-            Self::on_research_started => 17,
-            Self::on_robot_mined => 16,
-            Self::on_robot_pre_mined => 15,
-            Self::on_robot_built_entity => 14,
-            Self::on_player_crafted_item => 13,
-            Self::on_chunk_generated => 12,
-            Self::on_pre_player_mined_item => 11,
-            Self::on_rocket_launched => 10,
-            Self::on_pre_build => 9,
-            Self::on_player_mined_item => 8,
-            Self::on_sector_scanned => 7,
-            Self::on_built_entity => 6,
-            Self::on_picked_up_item => 5,
-            Self::on_entity_died => 4,
-            Self::on_gui_checked_state_changed => 3,
-            Self::on_gui_text_changed => 2,
-            Self::on_gui_click => 1,
-            Self::on_tick => 0,
-        }
+impl std::ops::Deref for events {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 184] = [
+            183, // on_player_input_method_changed
+            182, // on_cutscene_finished
+            181, // on_cutscene_started
+            180, // on_entity_color_changed
+            179, // on_gui_leave
+            178, // on_gui_hover
+            177, // on_player_alt_reverse_selected_area
+            176, // on_player_reverse_selected_area
+            175, // on_equipment_removed
+            174, // on_equipment_inserted
+            173, // on_entity_logistic_slot_changed
+            172, // on_spider_command_completed
+            171, // on_player_used_spider_remote
+            170, // on_player_configured_spider_remote
+            169, // on_cutscene_cancelled
+            168, // on_permission_group_added
+            167, // on_permission_group_deleted
+            166, // on_pre_permission_group_deleted
+            165, // on_permission_string_imported
+            164, // on_pre_permission_string_imported
+            163, // on_permission_group_edited
+            162, // on_player_flushed_fluid
+            161, // on_player_clicked_gps_tag
+            160, // on_entity_destroyed
+            159, // on_script_inventory_resized
+            158, // on_pre_script_inventory_resized
+            157, // on_pre_player_toggled_map_editor
+            156, // on_player_set_quick_bar_slot
+            155, // on_script_trigger_effect
+            154, // on_string_translated
+            153, // on_force_cease_fire_changed
+            152, // on_force_friends_changed
+            151, // on_gui_switch_state_changed
+            150, // on_gui_selected_tab_changed
+            149, // on_gui_location_changed
+            148, // on_gui_confirmed
+            147, // on_chart_tag_removed
+            146, // on_chart_tag_modified
+            145, // on_chart_tag_added
+            144, // on_trigger_fired_artillery
+            143, // on_build_base_arrived
+            142, // on_unit_group_finished_gathering
+            141, // on_unit_removed_from_group
+            140, // on_unit_added_to_group
+            139, // on_unit_group_created
+            138, // on_pre_player_removed
+            137, // on_entity_spawned
+            136, // on_post_entity_died
+            135, // on_robot_exploded_cliff
+            134, // on_pre_robot_exploded_cliff
+            133, // on_pre_chunk_deleted
+            132, // on_player_fast_transferred
+            131, // on_player_repaired_entity
+            130, // on_player_toggled_alt_mode
+            129, // on_surface_renamed
+            128, // on_surface_imported
+            127, // on_game_created_from_scenario
+            126, // on_brush_cloned
+            125, // on_area_cloned
+            124, // on_entity_cloned
+            123, // on_player_toggled_map_editor
+            122, // on_cancelled_upgrade
+            121, // on_marked_for_upgrade
+            120, // on_ai_command_completed
+            119, // on_script_path_request_finished
+            118, // on_rocket_launch_ordered
+            117, // on_player_unbanned
+            116, // on_player_kicked
+            115, // on_player_banned
+            114, // on_train_schedule_changed
+            113, // on_chunk_deleted
+            112, // on_pre_surface_cleared
+            111, // on_surface_cleared
+            110, // on_pre_player_left_game
+            109, // on_player_trash_inventory_changed
+            108, // on_forces_merged
+            107, // on_land_mine_armed
+            106, // on_force_reset
+            105, // on_technology_effects_reset
+            104, // on_chunk_charted
+            103, // on_entity_damaged
+            102, // on_player_cancelled_crafting
+            101, // on_pre_player_crafted_item
+            100, // on_player_display_scale_changed
+            99, // on_player_display_resolution_changed
+            98, // on_player_pipette
+            97, // on_pre_ghost_upgraded
+            96, // on_pre_ghost_deconstructed
+            95, // on_character_corpse_expired
+            94, // on_player_cheat_mode_disabled
+            93, // on_player_cheat_mode_enabled
+            92, // on_player_unmuted
+            91, // on_player_muted
+            90, // on_gui_value_changed
+            89, // on_gui_closed
+            88, // on_gui_opened
+            87, // on_mod_item_opened
+            86, // on_player_changed_position
+            85, // on_worker_robot_expired
+            84, // on_combat_robot_expired
+            83, // script_raised_set_tiles
+            82, // script_raised_teleported
+            81, // script_raised_revive
+            80, // script_raised_destroy
+            79, // script_raised_built
+            78, // on_player_demoted
+            77, // on_player_promoted
+            76, // on_player_used_capsule
+            75, // on_player_removed
+            74, // on_console_command
+            73, // on_console_chat
+            72, // on_player_configured_blueprint
+            71, // on_player_deconstructed_area
+            70, // on_player_setup_blueprint
+            69, // on_gui_elem_changed
+            68, // on_train_created
+            67, // on_player_mined_entity
+            66, // on_robot_mined_entity
+            65, // on_pre_surface_deleted
+            64, // on_surface_deleted
+            63, // on_surface_created
+            62, // on_difficulty_settings_changed
+            61, // on_runtime_mod_setting_changed
+            60, // on_gui_selection_state_changed
+            59, // on_entity_renamed
+            58, // on_player_changed_force
+            57, // on_biter_base_built
+            56, // on_player_dropped_item
+            55, // on_market_item_purchased
+            54, // on_selected_entity_changed
+            53, // on_player_changed_surface
+            52, // on_player_alt_selected_area
+            51, // on_player_selected_area
+            50, // on_robot_mined_tile
+            49, // on_robot_built_tile
+            48, // on_player_mined_tile
+            47, // on_player_built_tile
+            46, // on_player_left_game
+            45, // on_player_joined_game
+            44, // on_player_respawned
+            43, // on_player_died
+            42, // on_pre_player_died
+            41, // on_player_removed_equipment
+            40, // on_player_placed_equipment
+            39, // on_player_gun_inventory_changed
+            38, // on_player_ammo_inventory_changed
+            37, // on_player_armor_inventory_changed
+            36, // on_lua_shortcut
+            35, // on_cutscene_waypoint_reached
+            34, // on_player_main_inventory_changed
+            33, // on_entity_settings_pasted
+            32, // on_pre_entity_settings_pasted
+            31, // on_player_cursor_stack_changed
+            30, // on_forces_merging
+            29, // on_force_created
+            28, // on_player_driving_changed_state
+            27, // on_resource_depleted
+            26, // on_player_created
+            25, // on_train_changed_state
+            24, // on_trigger_created_entity
+            23, // on_cancelled_deconstruction
+            22, // on_marked_for_deconstruction
+            21, // on_player_rotated_entity
+            20, // on_research_cancelled
+            19, // on_research_reversed
+            18, // on_research_finished
+            17, // on_research_started
+            16, // on_robot_mined
+            15, // on_robot_pre_mined
+            14, // on_robot_built_entity
+            13, // on_player_crafted_item
+            12, // on_chunk_generated
+            11, // on_pre_player_mined_item
+            10, // on_rocket_launched
+            9, // on_pre_build
+            8, // on_player_mined_item
+            7, // on_sector_scanned
+            6, // on_built_entity
+            5, // on_picked_up_item
+            4, // on_entity_died
+            3, // on_gui_checked_state_changed
+            2, // on_gui_text_changed
+            1, // on_gui_click
+            0, // on_tick
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for events {
     fn key(&self) -> &'static str {
         match self {
             Self::on_player_input_method_changed => "on_player_input_method_changed",
@@ -1374,17 +1425,21 @@ pub enum controllers {
     cutscene,
     spectator,
 }
-impl crate::defines::Defines<u8> for controllers {
-    fn value(&self) -> u8 {
-        match self {
-            Self::ghost => 0,
-            Self::character => 1,
-            Self::god => 2,
-            Self::editor => 4,
-            Self::cutscene => 6,
-            Self::spectator => 5,
-        }
+impl std::ops::Deref for controllers {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 6] = [
+            0, // ghost
+            1, // character
+            2, // god
+            4, // editor
+            6, // cutscene
+            5, // spectator
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for controllers {
     fn key(&self) -> &'static str {
         match self {
             Self::ghost => "ghost",
@@ -1417,18 +1472,22 @@ pub enum group_state {
     pathfinding,
     wander_in_group,
 }
-impl crate::defines::Defines<u8> for group_state {
-    fn value(&self) -> u8 {
-        match self {
-            Self::gathering => 0,
-            Self::moving => 1,
-            Self::attacking_distraction => 2,
-            Self::attacking_target => 3,
-            Self::finished => 4,
-            Self::pathfinding => 5,
-            Self::wander_in_group => 6,
-        }
+impl std::ops::Deref for group_state {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 7] = [
+            0, // gathering
+            1, // moving
+            2, // attacking_distraction
+            3, // attacking_target
+            4, // finished
+            5, // pathfinding
+            6, // wander_in_group
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for group_state {
     fn key(&self) -> &'static str {
         match self {
             Self::gathering => "gathering",
@@ -1459,14 +1518,18 @@ pub enum wire_type {
     green,
     copper,
 }
-impl crate::defines::Defines<u8> for wire_type {
-    fn value(&self) -> u8 {
-        match self {
-            Self::red => 2,
-            Self::green => 3,
-            Self::copper => 1,
-        }
+impl std::ops::Deref for wire_type {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 3] = [
+            2, // red
+            3, // green
+            1, // copper
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for wire_type {
     fn key(&self) -> &'static str {
         match self {
             Self::red => "red",
@@ -1503,28 +1566,32 @@ pub enum circuit_connector_id {
     offshore_pump,
     pump,
 }
-impl crate::defines::Defines<u8> for circuit_connector_id {
-    fn value(&self) -> u8 {
-        match self {
-            Self::accumulator => 1,
-            Self::constant_combinator => 1,
-            Self::container => 1,
-            Self::linked_container => 1,
-            Self::programmable_speaker => 1,
-            Self::rail_signal => 1,
-            Self::rail_chain_signal => 1,
-            Self::roboport => 1,
-            Self::storage_tank => 1,
-            Self::wall => 1,
-            Self::electric_pole => 1,
-            Self::inserter => 1,
-            Self::lamp => 1,
-            Self::combinator_input => 1,
-            Self::combinator_output => 2,
-            Self::offshore_pump => 1,
-            Self::pump => 1,
-        }
+impl std::ops::Deref for circuit_connector_id {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 17] = [
+            1, // accumulator
+            1, // constant_combinator
+            1, // container
+            1, // linked_container
+            1, // programmable_speaker
+            1, // rail_signal
+            1, // rail_chain_signal
+            1, // roboport
+            1, // storage_tank
+            1, // wall
+            1, // electric_pole
+            1, // inserter
+            1, // lamp
+            1, // combinator_input
+            2, // combinator_output
+            1, // offshore_pump
+            1, // pump
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for circuit_connector_id {
     fn key(&self) -> &'static str {
         match self {
             Self::accumulator => "accumulator",
@@ -1580,19 +1647,23 @@ pub enum circuit_condition_index {
     offshore_pump,
     pump,
 }
-impl crate::defines::Defines<u8> for circuit_condition_index {
-    fn value(&self) -> u8 {
-        match self {
-            Self::inserter_circuit => 1,
-            Self::inserter_logistic => 2,
-            Self::lamp => 1,
-            Self::arithmetic_combinator => 1,
-            Self::decider_combinator => 1,
-            Self::constant_combinator => 1,
-            Self::offshore_pump => 1,
-            Self::pump => 1,
-        }
+impl std::ops::Deref for circuit_condition_index {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 8] = [
+            1, // inserter_circuit
+            2, // inserter_logistic
+            1, // lamp
+            1, // arithmetic_combinator
+            1, // decider_combinator
+            1, // constant_combinator
+            1, // offshore_pump
+            1, // pump
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for circuit_condition_index {
     fn key(&self) -> &'static str {
         match self {
             Self::inserter_circuit => "inserter_circuit",
@@ -1625,14 +1696,18 @@ pub enum wire_connection_id {
     power_switch_left,
     power_switch_right,
 }
-impl crate::defines::Defines<u8> for wire_connection_id {
-    fn value(&self) -> u8 {
-        match self {
-            Self::electric_pole => 0,
-            Self::power_switch_left => 0,
-            Self::power_switch_right => 1,
-        }
+impl std::ops::Deref for wire_connection_id {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 3] = [
+            0, // electric_pole
+            0, // power_switch_left
+            1, // power_switch_right
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for wire_connection_id {
     fn key(&self) -> &'static str {
         match self {
             Self::electric_pole => "electric_pole",
@@ -1663,22 +1738,26 @@ pub enum train_state {
     manual_control,
     destination_full,
 }
-impl crate::defines::Defines<u8> for train_state {
-    fn value(&self) -> u8 {
-        match self {
-            Self::on_the_path => 0,
-            Self::path_lost => 1,
-            Self::no_schedule => 2,
-            Self::no_path => 3,
-            Self::arrive_signal => 4,
-            Self::wait_signal => 5,
-            Self::arrive_station => 6,
-            Self::wait_station => 7,
-            Self::manual_control_stop => 8,
-            Self::manual_control => 9,
-            Self::destination_full => 10,
-        }
+impl std::ops::Deref for train_state {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 11] = [
+            0, // on_the_path
+            1, // path_lost
+            2, // no_schedule
+            3, // no_path
+            4, // arrive_signal
+            5, // wait_signal
+            6, // arrive_station
+            7, // wait_station
+            8, // manual_control_stop
+            9, // manual_control
+            10, // destination_full
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for train_state {
     fn key(&self) -> &'static str {
         match self {
             Self::on_the_path => "on_the_path",
@@ -1718,15 +1797,19 @@ pub enum signal_state {
     reserved,
     reserved_by_circuit_network,
 }
-impl crate::defines::Defines<u8> for signal_state {
-    fn value(&self) -> u8 {
-        match self {
-            Self::open => 0,
-            Self::closed => 1,
-            Self::reserved => 2,
-            Self::reserved_by_circuit_network => 3,
-        }
+impl std::ops::Deref for signal_state {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 4] = [
+            0, // open
+            1, // closed
+            2, // reserved
+            3, // reserved_by_circuit_network
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for signal_state {
     fn key(&self) -> &'static str {
         match self {
             Self::open => "open",
@@ -1752,15 +1835,19 @@ pub enum chain_signal_state {
     partially_open,
     none_open,
 }
-impl crate::defines::Defines<u8> for chain_signal_state {
-    fn value(&self) -> u8 {
-        match self {
-            Self::none => 0,
-            Self::all_open => 1,
-            Self::partially_open => 2,
-            Self::none_open => 3,
-        }
+impl std::ops::Deref for chain_signal_state {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 4] = [
+            0, // none
+            1, // all_open
+            2, // partially_open
+            3, // none_open
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for chain_signal_state {
     fn key(&self) -> &'static str {
         match self {
             Self::none => "none",
@@ -1784,13 +1871,17 @@ pub enum rail_direction {
     front,
     back,
 }
-impl crate::defines::Defines<u8> for rail_direction {
-    fn value(&self) -> u8 {
-        match self {
-            Self::front => 0,
-            Self::back => 1,
-        }
+impl std::ops::Deref for rail_direction {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 2] = [
+            0, // front
+            1, // back
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for rail_direction {
     fn key(&self) -> &'static str {
         match self {
             Self::front => "front",
@@ -1812,15 +1903,19 @@ pub enum rail_connection_direction {
     right,
     none,
 }
-impl crate::defines::Defines<u8> for rail_connection_direction {
-    fn value(&self) -> u8 {
-        match self {
-            Self::left => 0,
-            Self::straight => 1,
-            Self::right => 2,
-            Self::none => 3,
-        }
+impl std::ops::Deref for rail_connection_direction {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 4] = [
+            0, // left
+            1, // straight
+            2, // right
+            3, // none
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for rail_connection_direction {
     fn key(&self) -> &'static str {
         match self {
             Self::left => "left",
@@ -1849,16 +1944,20 @@ pub mod control_behavior {
             read_hand_contents,
             set_stack_size,
         }
-        impl crate::defines::Defines<u8> for circuit_mode_of_operation {
-            fn value(&self) -> u8 {
-                match self {
-                    Self::none => 3,
-                    Self::enable_disable => 0,
-                    Self::set_filters => 1,
-                    Self::read_hand_contents => 2,
-                    Self::set_stack_size => 4,
-                }
+        impl std::ops::Deref for circuit_mode_of_operation {
+            type Target = u8;
+            fn deref(&self) -> &'static u8 {
+                const VALUES: [u8; 5] = [
+                    3, // none
+                    0, // enable_disable
+                    1, // set_filters
+                    2, // read_hand_contents
+                    4, // set_stack_size
+                ];
+                &VALUES[*self as usize]
             }
+        }
+        impl crate::defines::Defines<u8> for circuit_mode_of_operation {
             fn key(&self) -> &'static str {
                 match self {
                     Self::none => "none",
@@ -1883,13 +1982,17 @@ pub mod control_behavior {
             hold,
             pulse,
         }
-        impl crate::defines::Defines<u8> for hand_read_mode {
-            fn value(&self) -> u8 {
-                match self {
-                    Self::hold => 1,
-                    Self::pulse => 0,
-                }
+        impl std::ops::Deref for hand_read_mode {
+            type Target = u8;
+            fn deref(&self) -> &'static u8 {
+                const VALUES: [u8; 2] = [
+                    1, // hold
+                    0, // pulse
+                ];
+                &VALUES[*self as usize]
             }
+        }
+        impl crate::defines::Defines<u8> for hand_read_mode {
             fn key(&self) -> &'static str {
                 match self {
                     Self::hold => "hold",
@@ -1910,13 +2013,17 @@ pub mod control_behavior {
             send_contents,
             set_requests,
         }
-        impl crate::defines::Defines<u8> for circuit_mode_of_operation {
-            fn value(&self) -> u8 {
-                match self {
-                    Self::send_contents => 0,
-                    Self::set_requests => 1,
-                }
+        impl std::ops::Deref for circuit_mode_of_operation {
+            type Target = u8;
+            fn deref(&self) -> &'static u8 {
+                const VALUES: [u8; 2] = [
+                    0, // send_contents
+                    1, // set_requests
+                ];
+                &VALUES[*self as usize]
             }
+        }
+        impl crate::defines::Defines<u8> for circuit_mode_of_operation {
             fn key(&self) -> &'static str {
                 match self {
                     Self::send_contents => "send_contents",
@@ -1936,12 +2043,16 @@ pub mod control_behavior {
         pub enum circuit_mode_of_operation {
             use_colors,
         }
-        impl crate::defines::Defines<u8> for circuit_mode_of_operation {
-            fn value(&self) -> u8 {
-                match self {
-                    Self::use_colors => 0,
-                }
+        impl std::ops::Deref for circuit_mode_of_operation {
+            type Target = u8;
+            fn deref(&self) -> &'static u8 {
+                const VALUES: [u8; 1] = [
+                    0, // use_colors
+                ];
+                &VALUES[*self as usize]
             }
+        }
+        impl crate::defines::Defines<u8> for circuit_mode_of_operation {
             fn key(&self) -> &'static str {
                 match self {
                     Self::use_colors => "use_colors",
@@ -1960,13 +2071,17 @@ pub mod control_behavior {
             this_miner,
             entire_patch,
         }
-        impl crate::defines::Defines<u8> for resource_read_mode {
-            fn value(&self) -> u8 {
-                match self {
-                    Self::this_miner => 0,
-                    Self::entire_patch => 1,
-                }
+        impl std::ops::Deref for resource_read_mode {
+            type Target = u8;
+            fn deref(&self) -> &'static u8 {
+                const VALUES: [u8; 2] = [
+                    0, // this_miner
+                    1, // entire_patch
+                ];
+                &VALUES[*self as usize]
             }
+        }
+        impl crate::defines::Defines<u8> for resource_read_mode {
             fn key(&self) -> &'static str {
                 match self {
                     Self::this_miner => "this_miner",
@@ -1987,13 +2102,17 @@ pub mod control_behavior {
             pulse,
             hold,
         }
-        impl crate::defines::Defines<u8> for content_read_mode {
-            fn value(&self) -> u8 {
-                match self {
-                    Self::pulse => 0,
-                    Self::hold => 1,
-                }
+        impl std::ops::Deref for content_read_mode {
+            type Target = u8;
+            fn deref(&self) -> &'static u8 {
+                const VALUES: [u8; 2] = [
+                    0, // pulse
+                    1, // hold
+                ];
+                &VALUES[*self as usize]
             }
+        }
+        impl crate::defines::Defines<u8> for content_read_mode {
             fn key(&self) -> &'static str {
                 match self {
                     Self::pulse => "pulse",
@@ -2029,29 +2148,33 @@ pub mod control_behavior {
         mining_drill,
         programmable_speaker,
     }
-    impl crate::defines::Defines<u8> for r#type {
-        fn value(&self) -> u8 {
-            match self {
-                Self::container => 1,
-                Self::generic_on_off => 2,
-                Self::inserter => 3,
-                Self::lamp => 4,
-                Self::logistic_container => 5,
-                Self::roboport => 6,
-                Self::storage_tank => 7,
-                Self::train_stop => 8,
-                Self::decider_combinator => 9,
-                Self::arithmetic_combinator => 10,
-                Self::constant_combinator => 11,
-                Self::transport_belt => 12,
-                Self::accumulator => 13,
-                Self::rail_signal => 14,
-                Self::rail_chain_signal => 18,
-                Self::wall => 15,
-                Self::mining_drill => 16,
-                Self::programmable_speaker => 17,
-            }
+    impl std::ops::Deref for r#type {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 18] = [
+                1, // container
+                2, // generic_on_off
+                3, // inserter
+                4, // lamp
+                5, // logistic_container
+                6, // roboport
+                7, // storage_tank
+                8, // train_stop
+                9, // decider_combinator
+                10, // arithmetic_combinator
+                11, // constant_combinator
+                12, // transport_belt
+                13, // accumulator
+                14, // rail_signal
+                18, // rail_chain_signal
+                15, // wall
+                16, // mining_drill
+                17, // programmable_speaker
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for r#type {
         fn key(&self) -> &'static str {
             match self {
                 Self::container => "container",
@@ -2108,17 +2231,21 @@ pub enum chunk_generated_status {
     tiles,
     entities,
 }
-impl crate::defines::Defines<u8> for chunk_generated_status {
-    fn value(&self) -> u8 {
-        match self {
-            Self::nothing => 0,
-            Self::custom_tiles => 10,
-            Self::basic_tiles => 20,
-            Self::corrected_tiles => 30,
-            Self::tiles => 40,
-            Self::entities => 50,
-        }
+impl std::ops::Deref for chunk_generated_status {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 6] = [
+            0, // nothing
+            10, // custom_tiles
+            20, // basic_tiles
+            30, // corrected_tiles
+            40, // tiles
+            50, // entities
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for chunk_generated_status {
     fn key(&self) -> &'static str {
         match self {
             Self::nothing => "nothing",
@@ -2150,17 +2277,21 @@ pub enum logistic_mode {
     passive_provider,
     buffer,
 }
-impl crate::defines::Defines<u8> for logistic_mode {
-    fn value(&self) -> u8 {
-        match self {
-            Self::none => 0,
-            Self::active_provider => 1,
-            Self::storage => 2,
-            Self::requester => 3,
-            Self::passive_provider => 4,
-            Self::buffer => 5,
-        }
+impl std::ops::Deref for logistic_mode {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 6] = [
+            0, // none
+            1, // active_provider
+            2, // storage
+            3, // requester
+            4, // passive_provider
+            5, // buffer
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for logistic_mode {
     fn key(&self) -> &'static str {
         match self {
             Self::none => "none",
@@ -2192,17 +2323,21 @@ pub enum logistic_member_index {
     character_provider,
     generic_on_off_behavior,
 }
-impl crate::defines::Defines<u8> for logistic_member_index {
-    fn value(&self) -> u8 {
-        match self {
-            Self::logistic_container => 0,
-            Self::vehicle_storage => 1,
-            Self::character_requester => 0,
-            Self::character_storage => 1,
-            Self::character_provider => 2,
-            Self::generic_on_off_behavior => 0,
-        }
+impl std::ops::Deref for logistic_member_index {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 6] = [
+            0, // logistic_container
+            1, // vehicle_storage
+            0, // character_requester
+            1, // character_storage
+            2, // character_provider
+            0, // generic_on_off_behavior
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for logistic_member_index {
     fn key(&self) -> &'static str {
         match self {
             Self::logistic_container => "logistic_container",
@@ -2231,13 +2366,17 @@ pub mod deconstruction_item {
         whitelist,
         blacklist,
     }
-    impl crate::defines::Defines<u8> for entity_filter_mode {
-        fn value(&self) -> u8 {
-            match self {
-                Self::whitelist => 0,
-                Self::blacklist => 1,
-            }
+    impl std::ops::Deref for entity_filter_mode {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 2] = [
+                0, // whitelist
+                1, // blacklist
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for entity_filter_mode {
         fn key(&self) -> &'static str {
             match self {
                 Self::whitelist => "whitelist",
@@ -2256,13 +2395,17 @@ pub mod deconstruction_item {
         whitelist,
         blacklist,
     }
-    impl crate::defines::Defines<u8> for tile_filter_mode {
-        fn value(&self) -> u8 {
-            match self {
-                Self::whitelist => 0,
-                Self::blacklist => 1,
-            }
+    impl std::ops::Deref for tile_filter_mode {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 2] = [
+                0, // whitelist
+                1, // blacklist
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for tile_filter_mode {
         fn key(&self) -> &'static str {
             match self {
                 Self::whitelist => "whitelist",
@@ -2283,15 +2426,19 @@ pub mod deconstruction_item {
         never,
         only,
     }
-    impl crate::defines::Defines<u8> for tile_selection_mode {
-        fn value(&self) -> u8 {
-            match self {
-                Self::normal => 0,
-                Self::always => 1,
-                Self::never => 2,
-                Self::only => 3,
-            }
+    impl std::ops::Deref for tile_selection_mode {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 4] = [
+                0, // normal
+                1, // always
+                2, // never
+                3, // only
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for tile_selection_mode {
         fn key(&self) -> &'static str {
             match self {
                 Self::normal => "normal",
@@ -2323,20 +2470,24 @@ pub enum alert_type {
     no_storage,
     train_out_of_fuel,
 }
-impl crate::defines::Defines<u8> for alert_type {
-    fn value(&self) -> u8 {
-        match self {
-            Self::entity_destroyed => 0,
-            Self::entity_under_attack => 1,
-            Self::not_enough_construction_robots => 2,
-            Self::no_material_for_construction => 3,
-            Self::not_enough_repair_packs => 4,
-            Self::turret_fire => 5,
-            Self::custom => 6,
-            Self::no_storage => 7,
-            Self::train_out_of_fuel => 8,
-        }
+impl std::ops::Deref for alert_type {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 9] = [
+            0, // entity_destroyed
+            1, // entity_under_attack
+            2, // not_enough_construction_robots
+            3, // no_material_for_construction
+            4, // not_enough_repair_packs
+            5, // turret_fire
+            6, // custom
+            7, // no_storage
+            8, // train_out_of_fuel
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for alert_type {
     fn key(&self) -> &'static str {
         match self {
             Self::entity_destroyed => "entity_destroyed",
@@ -2372,15 +2523,19 @@ pub enum mouse_button_type {
     right,
     middle,
 }
-impl crate::defines::Defines<u8> for mouse_button_type {
-    fn value(&self) -> u8 {
-        match self {
-            Self::none => 1,
-            Self::left => 2,
-            Self::right => 4,
-            Self::middle => 8,
-        }
+impl std::ops::Deref for mouse_button_type {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 4] = [
+            1, // none
+            2, // left
+            4, // right
+            8, // middle
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for mouse_button_type {
     fn key(&self) -> &'static str {
         match self {
             Self::none => "none",
@@ -2605,214 +2760,218 @@ pub enum input_action {
     wire_dragging,
     write_to_console,
 }
-impl crate::defines::Defines<u8> for input_action {
-    fn value(&self) -> u8 {
-        match self {
-            Self::activate_copy => 45,
-            Self::activate_cut => 46,
-            Self::activate_paste => 47,
-            Self::add_permission_group => 227,
-            Self::add_train_station => 96,
-            Self::admin_action => 195,
-            Self::alt_reverse_select_area => 164,
-            Self::alt_select_area => 162,
-            Self::alt_select_blueprint_entities => 121,
-            Self::alternative_copy => 119,
-            Self::begin_mining => 2,
-            Self::begin_mining_terrain => 62,
-            Self::build => 60,
-            Self::build_rail => 159,
-            Self::build_terrain => 152,
-            Self::cancel_craft => 83,
-            Self::cancel_deconstruct => 144,
-            Self::cancel_new_blueprint => 18,
-            Self::cancel_research => 160,
-            Self::cancel_upgrade => 145,
-            Self::change_active_character_tab => 100,
-            Self::change_active_item_group_for_crafting => 98,
-            Self::change_active_item_group_for_filters => 99,
-            Self::change_active_quick_bar => 231,
-            Self::change_arithmetic_combinator_parameters => 146,
-            Self::change_decider_combinator_parameters => 147,
-            Self::change_entity_label => 158,
-            Self::change_item_description => 157,
-            Self::change_item_label => 156,
-            Self::change_multiplayer_config => 194,
-            Self::change_picking_state => 199,
-            Self::change_programmable_speaker_alert_parameters => 149,
-            Self::change_programmable_speaker_circuit_parameters => 150,
-            Self::change_programmable_speaker_parameters => 148,
-            Self::change_riding_state => 63,
-            Self::change_shooting_state => 77,
-            Self::change_train_stop_station => 97,
-            Self::change_train_wait_condition => 153,
-            Self::change_train_wait_condition_data => 154,
-            Self::clear_cursor => 12,
-            Self::connect_rolling_stock => 9,
-            Self::copy => 118,
-            Self::copy_entity_settings => 20,
-            Self::copy_opened_blueprint => 124,
-            Self::copy_opened_item => 23,
-            Self::craft => 75,
-            Self::cursor_split => 71,
-            Self::cursor_transfer => 70,
-            Self::custom_input => 155,
-            Self::cycle_blueprint_book_backwards => 33,
-            Self::cycle_blueprint_book_forwards => 32,
-            Self::deconstruct => 116,
-            Self::delete_blueprint_library => 43,
-            Self::delete_blueprint_record => 129,
-            Self::delete_custom_tag => 225,
-            Self::delete_permission_group => 226,
-            Self::destroy_item => 67,
-            Self::destroy_opened_item => 22,
-            Self::disconnect_rolling_stock => 10,
-            Self::drag_train_schedule => 180,
-            Self::drag_train_wait_condition => 181,
-            Self::drop_blueprint_record => 128,
-            Self::drop_item => 59,
-            Self::edit_blueprint_tool_preview => 137,
-            Self::edit_custom_tag => 172,
-            Self::edit_permission_group => 173,
-            Self::export_blueprint => 139,
-            Self::fast_entity_split => 215,
-            Self::fast_entity_transfer => 213,
-            Self::flush_opened_entity_fluid => 54,
-            Self::flush_opened_entity_specific_fluid => 198,
-            Self::go_to_train_station => 240,
-            Self::grab_blueprint_record => 127,
-            Self::gui_checked_state_changed => 102,
-            Self::gui_click => 92,
-            Self::gui_confirmed => 93,
-            Self::gui_elem_changed => 178,
-            Self::gui_hover => 249,
-            Self::gui_leave => 250,
-            Self::gui_location_changed => 107,
-            Self::gui_selected_tab_changed => 104,
-            Self::gui_selection_state_changed => 103,
-            Self::gui_switch_state_changed => 106,
-            Self::gui_text_changed => 101,
-            Self::gui_value_changed => 105,
-            Self::import_blueprint => 140,
-            Self::import_blueprint_string => 174,
-            Self::import_blueprints_filtered => 141,
-            Self::import_permissions_string => 175,
-            Self::inventory_split => 82,
-            Self::inventory_transfer => 73,
-            Self::launch_rocket => 15,
-            Self::lua_shortcut => 196,
-            Self::map_editor_action => 191,
-            Self::market_offer => 95,
-            Self::mod_settings_changed => 170,
-            Self::open_achievements_gui => 31,
-            Self::open_blueprint_library_gui => 57,
-            Self::open_blueprint_record => 126,
-            Self::open_bonus_gui => 29,
-            Self::open_character_gui => 7,
-            Self::open_current_vehicle_gui => 8,
-            Self::open_equipment => 69,
-            Self::open_gui => 5,
-            Self::open_item => 64,
-            Self::open_logistic_gui => 40,
-            Self::open_mod_item => 68,
-            Self::open_parent_of_opened_item => 65,
-            Self::open_production_gui => 16,
-            Self::open_technology_gui => 14,
-            Self::open_tips_and_tricks_gui => 56,
-            Self::open_train_gui => 221,
-            Self::open_train_station_gui => 238,
-            Self::open_trains_gui => 30,
-            Self::paste_entity_settings => 21,
-            Self::place_equipment => 108,
-            Self::quick_bar_pick_slot => 188,
-            Self::quick_bar_set_selected_page => 189,
-            Self::quick_bar_set_slot => 187,
-            Self::reassign_blueprint => 125,
-            Self::remove_cables => 138,
-            Self::remove_train_station => 239,
-            Self::reset_assembling_machine => 13,
-            Self::reset_item => 66,
-            Self::reverse_select_area => 163,
-            Self::rotate_entity => 214,
-            Self::select_area => 161,
-            Self::select_blueprint_entities => 120,
-            Self::select_entity_slot => 183,
-            Self::select_item => 182,
-            Self::select_mapper_slot => 185,
-            Self::select_next_valid_gun => 41,
-            Self::select_tile_slot => 184,
-            Self::send_spidertron => 111,
-            Self::set_auto_launch_rocket => 207,
-            Self::set_autosort_inventory => 204,
-            Self::set_behavior_mode => 212,
-            Self::set_car_weapons_control => 229,
-            Self::set_circuit_condition => 86,
-            Self::set_circuit_mode_of_operation => 91,
-            Self::set_controller_logistic_trash_filter_item => 166,
-            Self::set_deconstruction_item_tile_selection_mode => 224,
-            Self::set_deconstruction_item_trees_and_rocks_only => 223,
-            Self::set_entity_color => 222,
-            Self::set_entity_energy_property => 171,
-            Self::set_entity_logistic_trash_filter_item => 167,
-            Self::set_filter => 84,
-            Self::set_flat_controller_gui => 205,
-            Self::set_heat_interface_mode => 237,
-            Self::set_heat_interface_temperature => 236,
-            Self::set_infinity_container_filter_item => 168,
-            Self::set_infinity_container_remove_unfiltered_items => 228,
-            Self::set_infinity_pipe_filter => 169,
-            Self::set_inserter_max_stack_size => 220,
-            Self::set_inventory_bar => 113,
-            Self::set_linked_container_link_i_d => 248,
-            Self::set_logistic_filter_item => 89,
-            Self::set_logistic_filter_signal => 90,
-            Self::set_player_color => 244,
-            Self::set_recipe_notifications => 206,
-            Self::set_request_from_buffers => 230,
-            Self::set_research_finished_stops_game => 219,
-            Self::set_signal => 87,
-            Self::set_splitter_priority => 234,
-            Self::set_train_stopped => 216,
-            Self::set_trains_limit => 246,
-            Self::set_vehicle_automatic_targeting_parameters => 151,
-            Self::setup_assembling_machine => 78,
-            Self::setup_blueprint => 122,
-            Self::setup_single_blueprint_record => 123,
-            Self::smart_pipette => 80,
-            Self::spawn_item => 132,
-            Self::stack_split => 81,
-            Self::stack_transfer => 72,
-            Self::start_repair => 115,
-            Self::start_research => 88,
-            Self::start_walking => 61,
-            Self::stop_building_by_moving => 53,
-            Self::switch_connect_to_logistic_network => 211,
-            Self::switch_constant_combinator_state => 208,
-            Self::switch_inserter_filter_mode_state => 210,
-            Self::switch_power_switch_state => 209,
-            Self::switch_to_rename_stop_gui => 28,
-            Self::take_equipment => 109,
-            Self::toggle_deconstruction_item_entity_filter_mode => 38,
-            Self::toggle_deconstruction_item_tile_filter_mode => 39,
-            Self::toggle_driving => 4,
-            Self::toggle_enable_vehicle_logistics_while_moving => 37,
-            Self::toggle_entity_logistic_requests => 52,
-            Self::toggle_equipment_movement_bonus => 50,
-            Self::toggle_map_editor => 42,
-            Self::toggle_personal_logistic_requests => 51,
-            Self::toggle_personal_roboport => 49,
-            Self::toggle_show_entity_info => 24,
-            Self::translate_string => 197,
-            Self::undo => 48,
-            Self::upgrade => 117,
-            Self::upgrade_opened_blueprint_by_item => 131,
-            Self::upgrade_opened_blueprint_by_record => 130,
-            Self::use_artillery_remote => 112,
-            Self::use_item => 110,
-            Self::wire_dragging => 76,
-            Self::write_to_console => 94,
-        }
+impl std::ops::Deref for input_action {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 203] = [
+            45, // activate_copy
+            46, // activate_cut
+            47, // activate_paste
+            227, // add_permission_group
+            96, // add_train_station
+            195, // admin_action
+            164, // alt_reverse_select_area
+            162, // alt_select_area
+            121, // alt_select_blueprint_entities
+            119, // alternative_copy
+            2, // begin_mining
+            62, // begin_mining_terrain
+            60, // build
+            159, // build_rail
+            152, // build_terrain
+            83, // cancel_craft
+            144, // cancel_deconstruct
+            18, // cancel_new_blueprint
+            160, // cancel_research
+            145, // cancel_upgrade
+            100, // change_active_character_tab
+            98, // change_active_item_group_for_crafting
+            99, // change_active_item_group_for_filters
+            231, // change_active_quick_bar
+            146, // change_arithmetic_combinator_parameters
+            147, // change_decider_combinator_parameters
+            158, // change_entity_label
+            157, // change_item_description
+            156, // change_item_label
+            194, // change_multiplayer_config
+            199, // change_picking_state
+            149, // change_programmable_speaker_alert_parameters
+            150, // change_programmable_speaker_circuit_parameters
+            148, // change_programmable_speaker_parameters
+            63, // change_riding_state
+            77, // change_shooting_state
+            97, // change_train_stop_station
+            153, // change_train_wait_condition
+            154, // change_train_wait_condition_data
+            12, // clear_cursor
+            9, // connect_rolling_stock
+            118, // copy
+            20, // copy_entity_settings
+            124, // copy_opened_blueprint
+            23, // copy_opened_item
+            75, // craft
+            71, // cursor_split
+            70, // cursor_transfer
+            155, // custom_input
+            33, // cycle_blueprint_book_backwards
+            32, // cycle_blueprint_book_forwards
+            116, // deconstruct
+            43, // delete_blueprint_library
+            129, // delete_blueprint_record
+            225, // delete_custom_tag
+            226, // delete_permission_group
+            67, // destroy_item
+            22, // destroy_opened_item
+            10, // disconnect_rolling_stock
+            180, // drag_train_schedule
+            181, // drag_train_wait_condition
+            128, // drop_blueprint_record
+            59, // drop_item
+            137, // edit_blueprint_tool_preview
+            172, // edit_custom_tag
+            173, // edit_permission_group
+            139, // export_blueprint
+            215, // fast_entity_split
+            213, // fast_entity_transfer
+            54, // flush_opened_entity_fluid
+            198, // flush_opened_entity_specific_fluid
+            240, // go_to_train_station
+            127, // grab_blueprint_record
+            102, // gui_checked_state_changed
+            92, // gui_click
+            93, // gui_confirmed
+            178, // gui_elem_changed
+            249, // gui_hover
+            250, // gui_leave
+            107, // gui_location_changed
+            104, // gui_selected_tab_changed
+            103, // gui_selection_state_changed
+            106, // gui_switch_state_changed
+            101, // gui_text_changed
+            105, // gui_value_changed
+            140, // import_blueprint
+            174, // import_blueprint_string
+            141, // import_blueprints_filtered
+            175, // import_permissions_string
+            82, // inventory_split
+            73, // inventory_transfer
+            15, // launch_rocket
+            196, // lua_shortcut
+            191, // map_editor_action
+            95, // market_offer
+            170, // mod_settings_changed
+            31, // open_achievements_gui
+            57, // open_blueprint_library_gui
+            126, // open_blueprint_record
+            29, // open_bonus_gui
+            7, // open_character_gui
+            8, // open_current_vehicle_gui
+            69, // open_equipment
+            5, // open_gui
+            64, // open_item
+            40, // open_logistic_gui
+            68, // open_mod_item
+            65, // open_parent_of_opened_item
+            16, // open_production_gui
+            14, // open_technology_gui
+            56, // open_tips_and_tricks_gui
+            221, // open_train_gui
+            238, // open_train_station_gui
+            30, // open_trains_gui
+            21, // paste_entity_settings
+            108, // place_equipment
+            188, // quick_bar_pick_slot
+            189, // quick_bar_set_selected_page
+            187, // quick_bar_set_slot
+            125, // reassign_blueprint
+            138, // remove_cables
+            239, // remove_train_station
+            13, // reset_assembling_machine
+            66, // reset_item
+            163, // reverse_select_area
+            214, // rotate_entity
+            161, // select_area
+            120, // select_blueprint_entities
+            183, // select_entity_slot
+            182, // select_item
+            185, // select_mapper_slot
+            41, // select_next_valid_gun
+            184, // select_tile_slot
+            111, // send_spidertron
+            207, // set_auto_launch_rocket
+            204, // set_autosort_inventory
+            212, // set_behavior_mode
+            229, // set_car_weapons_control
+            86, // set_circuit_condition
+            91, // set_circuit_mode_of_operation
+            166, // set_controller_logistic_trash_filter_item
+            224, // set_deconstruction_item_tile_selection_mode
+            223, // set_deconstruction_item_trees_and_rocks_only
+            222, // set_entity_color
+            171, // set_entity_energy_property
+            167, // set_entity_logistic_trash_filter_item
+            84, // set_filter
+            205, // set_flat_controller_gui
+            237, // set_heat_interface_mode
+            236, // set_heat_interface_temperature
+            168, // set_infinity_container_filter_item
+            228, // set_infinity_container_remove_unfiltered_items
+            169, // set_infinity_pipe_filter
+            220, // set_inserter_max_stack_size
+            113, // set_inventory_bar
+            248, // set_linked_container_link_i_d
+            89, // set_logistic_filter_item
+            90, // set_logistic_filter_signal
+            244, // set_player_color
+            206, // set_recipe_notifications
+            230, // set_request_from_buffers
+            219, // set_research_finished_stops_game
+            87, // set_signal
+            234, // set_splitter_priority
+            216, // set_train_stopped
+            246, // set_trains_limit
+            151, // set_vehicle_automatic_targeting_parameters
+            78, // setup_assembling_machine
+            122, // setup_blueprint
+            123, // setup_single_blueprint_record
+            80, // smart_pipette
+            132, // spawn_item
+            81, // stack_split
+            72, // stack_transfer
+            115, // start_repair
+            88, // start_research
+            61, // start_walking
+            53, // stop_building_by_moving
+            211, // switch_connect_to_logistic_network
+            208, // switch_constant_combinator_state
+            210, // switch_inserter_filter_mode_state
+            209, // switch_power_switch_state
+            28, // switch_to_rename_stop_gui
+            109, // take_equipment
+            38, // toggle_deconstruction_item_entity_filter_mode
+            39, // toggle_deconstruction_item_tile_filter_mode
+            4, // toggle_driving
+            37, // toggle_enable_vehicle_logistics_while_moving
+            52, // toggle_entity_logistic_requests
+            50, // toggle_equipment_movement_bonus
+            42, // toggle_map_editor
+            51, // toggle_personal_logistic_requests
+            49, // toggle_personal_roboport
+            24, // toggle_show_entity_info
+            197, // translate_string
+            48, // undo
+            117, // upgrade
+            131, // upgrade_opened_blueprint_by_item
+            130, // upgrade_opened_blueprint_by_record
+            112, // use_artillery_remote
+            110, // use_item
+            76, // wire_dragging
+            94, // write_to_console
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for input_action {
     fn key(&self) -> &'static str {
         match self {
             Self::activate_copy => "activate_copy",
@@ -3238,17 +3397,21 @@ pub enum build_check_type {
     blueprint_ghost,
     ghost_revive,
 }
-impl crate::defines::Defines<u8> for build_check_type {
-    fn value(&self) -> u8 {
-        match self {
-            Self::script => 0,
-            Self::manual => 1,
-            Self::manual_ghost => 3,
-            Self::script_ghost => 2,
-            Self::blueprint_ghost => 4,
-            Self::ghost_revive => 5,
-        }
+impl std::ops::Deref for build_check_type {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 6] = [
+            0, // script
+            1, // manual
+            3, // manual_ghost
+            2, // script_ghost
+            4, // blueprint_ghost
+            5, // ghost_revive
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for build_check_type {
     fn key(&self) -> &'static str {
         match self {
             Self::script => "script",
@@ -3294,31 +3457,35 @@ pub enum gui_type {
     tile,
     script_inventory,
 }
-impl crate::defines::Defines<u8> for gui_type {
-    fn value(&self) -> u8 {
-        match self {
-            Self::none => 0,
-            Self::entity => 1,
-            Self::research => 2,
-            Self::controller => 3,
-            Self::production => 4,
-            Self::item => 5,
-            Self::bonus => 6,
-            Self::trains => 7,
-            Self::achievement => 8,
-            Self::blueprint_library => 9,
-            Self::equipment => 10,
-            Self::logistic => 11,
-            Self::other_player => 12,
-            Self::permissions => 14,
-            Self::tutorials => 15,
-            Self::custom => 16,
-            Self::server_management => 17,
-            Self::player_management => 18,
-            Self::tile => 19,
-            Self::script_inventory => 23,
-        }
+impl std::ops::Deref for gui_type {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 20] = [
+            0, // none
+            1, // entity
+            2, // research
+            3, // controller
+            4, // production
+            5, // item
+            6, // bonus
+            7, // trains
+            8, // achievement
+            9, // blueprint_library
+            10, // equipment
+            11, // logistic
+            12, // other_player
+            14, // permissions
+            15, // tutorials
+            16, // custom
+            17, // server_management
+            18, // player_management
+            19, // tile
+            23, // script_inventory
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for gui_type {
     fn key(&self) -> &'static str {
         match self {
             Self::none => "none",
@@ -3376,15 +3543,19 @@ pub enum behavior_result {
     success,
     deleted,
 }
-impl crate::defines::Defines<u8> for behavior_result {
-    fn value(&self) -> u8 {
-        match self {
-            Self::in_progress => 0,
-            Self::fail => 1,
-            Self::success => 2,
-            Self::deleted => 3,
-        }
+impl std::ops::Deref for behavior_result {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 4] = [
+            0, // in_progress
+            1, // fail
+            2, // success
+            3, // deleted
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for behavior_result {
     fn key(&self) -> &'static str {
         match self {
             Self::in_progress => "in_progress",
@@ -3414,19 +3585,23 @@ pub enum flow_precision_index {
     two_hundred_fifty_hours,
     one_thousand_hours,
 }
-impl crate::defines::Defines<u8> for flow_precision_index {
-    fn value(&self) -> u8 {
-        match self {
-            Self::five_seconds => 0,
-            Self::one_minute => 1,
-            Self::ten_minutes => 2,
-            Self::one_hour => 3,
-            Self::ten_hours => 4,
-            Self::fifty_hours => 5,
-            Self::two_hundred_fifty_hours => 6,
-            Self::one_thousand_hours => 7,
-        }
+impl std::ops::Deref for flow_precision_index {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 8] = [
+            0, // five_seconds
+            1, // one_minute
+            2, // ten_minutes
+            3, // one_hour
+            4, // ten_hours
+            5, // fifty_hours
+            6, // two_hundred_fifty_hours
+            7, // one_thousand_hours
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for flow_precision_index {
     fn key(&self) -> &'static str {
         match self {
             Self::five_seconds => "five_seconds",
@@ -3500,55 +3675,59 @@ pub enum entity_status {
     not_connected_to_rail,
     cant_divide_segments,
 }
-impl crate::defines::Defines<u8> for entity_status {
-    fn value(&self) -> u8 {
-        match self {
-            Self::working => 1,
-            Self::normal => 2,
-            Self::no_power => 38,
-            Self::low_power => 12,
-            Self::no_fuel => 37,
-            Self::disabled_by_control_behavior => 39,
-            Self::opened_by_circuit_network => 41,
-            Self::closed_by_circuit_network => 40,
-            Self::disabled_by_script => 42,
-            Self::marked_for_deconstruction => 44,
-            Self::not_plugged_in_electric_network => 3,
-            Self::networks_connected => 4,
-            Self::networks_disconnected => 5,
-            Self::charging => 6,
-            Self::discharging => 7,
-            Self::fully_charged => 8,
-            Self::out_of_logistic_network => 13,
-            Self::no_recipe => 15,
-            Self::no_ingredients => 14,
-            Self::no_input_fluid => 19,
-            Self::no_research_in_progress => 16,
-            Self::no_minable_resources => 17,
-            Self::low_input_fluid => 18,
-            Self::fluid_ingredient_shortage => 20,
-            Self::full_output => 22,
-            Self::full_burnt_result_output => 23,
-            Self::item_ingredient_shortage => 21,
-            Self::missing_required_fluid => 24,
-            Self::missing_science_packs => 25,
-            Self::waiting_for_source_items => 26,
-            Self::waiting_for_space_in_destination => 27,
-            Self::preparing_rocket_for_launch => 28,
-            Self::waiting_to_launch_rocket => 29,
-            Self::launching_rocket => 30,
-            Self::no_modules_to_transmit => 31,
-            Self::recharging_after_power_outage => 32,
-            Self::waiting_for_target_to_be_built => 33,
-            Self::waiting_for_train => 34,
-            Self::no_ammo => 35,
-            Self::low_temperature => 36,
-            Self::disabled => 43,
-            Self::turned_off_during_daytime => 9,
-            Self::not_connected_to_rail => 11,
-            Self::cant_divide_segments => 10,
-        }
+impl std::ops::Deref for entity_status {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 44] = [
+            1, // working
+            2, // normal
+            38, // no_power
+            12, // low_power
+            37, // no_fuel
+            39, // disabled_by_control_behavior
+            41, // opened_by_circuit_network
+            40, // closed_by_circuit_network
+            42, // disabled_by_script
+            44, // marked_for_deconstruction
+            3, // not_plugged_in_electric_network
+            4, // networks_connected
+            5, // networks_disconnected
+            6, // charging
+            7, // discharging
+            8, // fully_charged
+            13, // out_of_logistic_network
+            15, // no_recipe
+            14, // no_ingredients
+            19, // no_input_fluid
+            16, // no_research_in_progress
+            17, // no_minable_resources
+            18, // low_input_fluid
+            20, // fluid_ingredient_shortage
+            22, // full_output
+            23, // full_burnt_result_output
+            21, // item_ingredient_shortage
+            24, // missing_required_fluid
+            25, // missing_science_packs
+            26, // waiting_for_source_items
+            27, // waiting_for_space_in_destination
+            28, // preparing_rocket_for_launch
+            29, // waiting_to_launch_rocket
+            30, // launching_rocket
+            31, // no_modules_to_transmit
+            32, // recharging_after_power_outage
+            33, // waiting_for_target_to_be_built
+            34, // waiting_for_train
+            35, // no_ammo
+            36, // low_temperature
+            43, // disabled
+            9, // turned_off_during_daytime
+            11, // not_connected_to_rail
+            10, // cant_divide_segments
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for entity_status {
     fn key(&self) -> &'static str {
         match self {
             Self::working => "working",
@@ -3665,26 +3844,30 @@ pub enum rocket_silo_status {
     doors_closing,
     launch_started,
 }
-impl crate::defines::Defines<u8> for rocket_silo_status {
-    fn value(&self) -> u8 {
-        match self {
-            Self::building_rocket => 0,
-            Self::create_rocket => 1,
-            Self::lights_blinking_open => 2,
-            Self::doors_opening => 3,
-            Self::doors_opened => 4,
-            Self::rocket_rising => 5,
-            Self::arms_advance => 6,
-            Self::rocket_ready => 7,
-            Self::launch_starting => 8,
-            Self::engine_starting => 9,
-            Self::arms_retract => 10,
-            Self::rocket_flying => 11,
-            Self::lights_blinking_close => 12,
-            Self::doors_closing => 13,
-            Self::launch_started => 14,
-        }
+impl std::ops::Deref for rocket_silo_status {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 15] = [
+            0, // building_rocket
+            1, // create_rocket
+            2, // lights_blinking_open
+            3, // doors_opening
+            4, // doors_opened
+            5, // rocket_rising
+            6, // arms_advance
+            7, // rocket_ready
+            8, // launch_starting
+            9, // engine_starting
+            10, // arms_retract
+            11, // rocket_flying
+            12, // lights_blinking_close
+            13, // doors_closing
+            14, // launch_started
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for rocket_silo_status {
     fn key(&self) -> &'static str {
         match self {
             Self::building_rocket => "building_rocket",
@@ -3731,14 +3914,18 @@ pub enum render_mode {
     chart,
     chart_zoomed_in,
 }
-impl crate::defines::Defines<u8> for render_mode {
-    fn value(&self) -> u8 {
-        match self {
-            Self::game => 1,
-            Self::chart => 2,
-            Self::chart_zoomed_in => 3,
-        }
+impl std::ops::Deref for render_mode {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 3] = [
+            1, // game
+            2, // chart
+            3, // chart_zoomed_in
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for render_mode {
     fn key(&self) -> &'static str {
         match self {
             Self::game => "game",
@@ -3760,13 +3947,17 @@ pub enum input_method {
     keyboard_and_mouse,
     game_controller,
 }
-impl crate::defines::Defines<u8> for input_method {
-    fn value(&self) -> u8 {
-        match self {
-            Self::keyboard_and_mouse => 0,
-            Self::game_controller => 1,
-        }
+impl std::ops::Deref for input_method {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 2] = [
+            0, // keyboard_and_mouse
+            1, // game_controller
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for input_method {
     fn key(&self) -> &'static str {
         match self {
             Self::keyboard_and_mouse => "keyboard_and_mouse",
@@ -3787,14 +3978,18 @@ pub enum game_controller_interaction {
     never,
     normal,
 }
-impl crate::defines::Defines<u8> for game_controller_interaction {
-    fn value(&self) -> u8 {
-        match self {
-            Self::always => 0,
-            Self::never => 2,
-            Self::normal => 1,
-        }
+impl std::ops::Deref for game_controller_interaction {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 3] = [
+            0, // always
+            2, // never
+            1, // normal
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for game_controller_interaction {
     fn key(&self) -> &'static str {
         match self {
             Self::always => "always",
@@ -3817,14 +4012,18 @@ pub enum rich_text_setting {
     disabled,
     highlight,
 }
-impl crate::defines::Defines<u8> for rich_text_setting {
-    fn value(&self) -> u8 {
-        match self {
-            Self::enabled => 17,
-            Self::disabled => 0,
-            Self::highlight => 30,
-        }
+impl std::ops::Deref for rich_text_setting {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 3] = [
+            17, // enabled
+            0, // disabled
+            30, // highlight
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for rich_text_setting {
     fn key(&self) -> &'static str {
         match self {
             Self::enabled => "enabled",
@@ -3848,15 +4047,19 @@ pub enum relative_gui_position {
     left,
     right,
 }
-impl crate::defines::Defines<u8> for relative_gui_position {
-    fn value(&self) -> u8 {
-        match self {
-            Self::top => 0,
-            Self::bottom => 1,
-            Self::left => 2,
-            Self::right => 3,
-        }
+impl std::ops::Deref for relative_gui_position {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 4] = [
+            0, // top
+            1, // bottom
+            2, // left
+            3, // right
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for relative_gui_position {
     fn key(&self) -> &'static str {
         match self {
             Self::top => "top",
@@ -3942,8 +4145,9 @@ pub enum relative_gui_type {
     resource_entity_gui,
     entity_variations_gui,
 }
-impl crate::defines::Defines<&'static str> for relative_gui_type {
-    fn value(&self) -> &'static str {
+impl std::ops::Deref for relative_gui_type {
+    type Target = str;
+    fn deref(&self) -> &'static str {
         match self {
             Self::blueprint_library_gui => "blueprint-library-gui",
             Self::production_gui => "production-gui",
@@ -4011,6 +4215,8 @@ impl crate::defines::Defines<&'static str> for relative_gui_type {
             Self::entity_variations_gui => "entity-variations-gui",
         }
     }
+}
+impl crate::defines::Defines<&'static str> for relative_gui_type {
     fn key(&self) -> &'static str {
         match self {
             Self::blueprint_library_gui => "blueprint_library_gui",
@@ -4163,22 +4369,26 @@ pub enum disconnect_reason {
     banned,
     switching_servers,
 }
-impl crate::defines::Defines<u8> for disconnect_reason {
-    fn value(&self) -> u8 {
-        match self {
-            Self::quit => 0,
-            Self::dropped => 1,
-            Self::reconnect => 2,
-            Self::wrong_input => 3,
-            Self::desync_limit_reached => 4,
-            Self::cannot_keep_up => 5,
-            Self::afk => 6,
-            Self::kicked => 7,
-            Self::kicked_and_deleted => 8,
-            Self::banned => 9,
-            Self::switching_servers => 11,
-        }
+impl std::ops::Deref for disconnect_reason {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 11] = [
+            0, // quit
+            1, // dropped
+            2, // reconnect
+            3, // wrong_input
+            4, // desync_limit_reached
+            5, // cannot_keep_up
+            6, // afk
+            7, // kicked
+            8, // kicked_and_deleted
+            9, // banned
+            11, // switching_servers
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for disconnect_reason {
     fn key(&self) -> &'static str {
         match self {
             Self::quit => "quit",
@@ -4232,28 +4442,32 @@ pub mod prototypes {
         research_achievement,
         train_path_achievement,
     }
-    impl crate::defines::Defines<u8> for achievement {
-        fn value(&self) -> u8 {
-            match self {
-                Self::achievement => 0,
-                Self::build_entity_achievement => 0,
-                Self::combat_robot_count => 0,
-                Self::construct_with_robots_achievement => 0,
-                Self::deconstruct_with_robots_achievement => 0,
-                Self::deliver_by_robots_achievement => 0,
-                Self::dont_build_entity_achievement => 0,
-                Self::dont_craft_manually_achievement => 0,
-                Self::dont_use_entity_in_energy_production_achievement => 0,
-                Self::finish_the_game_achievement => 0,
-                Self::group_attack_achievement => 0,
-                Self::kill_achievement => 0,
-                Self::player_damaged_achievement => 0,
-                Self::produce_achievement => 0,
-                Self::produce_per_hour_achievement => 0,
-                Self::research_achievement => 0,
-                Self::train_path_achievement => 0,
-            }
+    impl std::ops::Deref for achievement {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 17] = [
+                0, // achievement
+                0, // build-entity-achievement
+                0, // combat-robot-count
+                0, // construct-with-robots-achievement
+                0, // deconstruct-with-robots-achievement
+                0, // deliver-by-robots-achievement
+                0, // dont-build-entity-achievement
+                0, // dont-craft-manually-achievement
+                0, // dont-use-entity-in-energy-production-achievement
+                0, // finish-the-game-achievement
+                0, // group-attack-achievement
+                0, // kill-achievement
+                0, // player-damaged-achievement
+                0, // produce-achievement
+                0, // produce-per-hour-achievement
+                0, // research-achievement
+                0, // train-path-achievement
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for achievement {
         fn key(&self) -> &'static str {
             match self {
                 Self::achievement => "achievement",
@@ -4301,12 +4515,16 @@ pub mod prototypes {
     pub enum ambient_sound {
         ambient_sound,
     }
-    impl crate::defines::Defines<u8> for ambient_sound {
-        fn value(&self) -> u8 {
-            match self {
-                Self::ambient_sound => 0,
-            }
+    impl std::ops::Deref for ambient_sound {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // ambient-sound
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for ambient_sound {
         fn key(&self) -> &'static str {
             match self {
                 Self::ambient_sound => "ambient-sound",
@@ -4322,12 +4540,16 @@ pub mod prototypes {
     pub enum ammo_category {
         ammo_category,
     }
-    impl crate::defines::Defines<u8> for ammo_category {
-        fn value(&self) -> u8 {
-            match self {
-                Self::ammo_category => 0,
-            }
+    impl std::ops::Deref for ammo_category {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // ammo-category
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for ammo_category {
         fn key(&self) -> &'static str {
             match self {
                 Self::ammo_category => "ammo-category",
@@ -4343,12 +4565,16 @@ pub mod prototypes {
     pub enum animation {
         animation,
     }
-    impl crate::defines::Defines<u8> for animation {
-        fn value(&self) -> u8 {
-            match self {
-                Self::animation => 0,
-            }
+    impl std::ops::Deref for animation {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // animation
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for animation {
         fn key(&self) -> &'static str {
             match self {
                 Self::animation => "animation",
@@ -4364,12 +4590,16 @@ pub mod prototypes {
     pub enum autoplace_control {
         autoplace_control,
     }
-    impl crate::defines::Defines<u8> for autoplace_control {
-        fn value(&self) -> u8 {
-            match self {
-                Self::autoplace_control => 0,
-            }
+    impl std::ops::Deref for autoplace_control {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // autoplace-control
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for autoplace_control {
         fn key(&self) -> &'static str {
             match self {
                 Self::autoplace_control => "autoplace-control",
@@ -4385,12 +4615,16 @@ pub mod prototypes {
     pub enum custom_input {
         custom_input,
     }
-    impl crate::defines::Defines<u8> for custom_input {
-        fn value(&self) -> u8 {
-            match self {
-                Self::custom_input => 0,
-            }
+    impl std::ops::Deref for custom_input {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // custom-input
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for custom_input {
         fn key(&self) -> &'static str {
             match self {
                 Self::custom_input => "custom-input",
@@ -4406,12 +4640,16 @@ pub mod prototypes {
     pub enum damage_type {
         damage_type,
     }
-    impl crate::defines::Defines<u8> for damage_type {
-        fn value(&self) -> u8 {
-            match self {
-                Self::damage_type => 0,
-            }
+    impl std::ops::Deref for damage_type {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // damage-type
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for damage_type {
         fn key(&self) -> &'static str {
             match self {
                 Self::damage_type => "damage-type",
@@ -4427,12 +4665,16 @@ pub mod prototypes {
     pub enum decorative {
         optimized_decorative,
     }
-    impl crate::defines::Defines<u8> for decorative {
-        fn value(&self) -> u8 {
-            match self {
-                Self::optimized_decorative => 0,
-            }
+    impl std::ops::Deref for decorative {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // optimized-decorative
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for decorative {
         fn key(&self) -> &'static str {
             match self {
                 Self::optimized_decorative => "optimized-decorative",
@@ -4448,12 +4690,16 @@ pub mod prototypes {
     pub enum editor_controller {
         editor_controller,
     }
-    impl crate::defines::Defines<u8> for editor_controller {
-        fn value(&self) -> u8 {
-            match self {
-                Self::editor_controller => 0,
-            }
+    impl std::ops::Deref for editor_controller {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // editor-controller
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for editor_controller {
         fn key(&self) -> &'static str {
             match self {
                 Self::editor_controller => "editor-controller",
@@ -4572,115 +4818,119 @@ pub mod prototypes {
         unit_spawner,
         wall,
     }
-    impl crate::defines::Defines<u8> for entity {
-        fn value(&self) -> u8 {
-            match self {
-                Self::accumulator => 0,
-                Self::ammo_turret => 0,
-                Self::arithmetic_combinator => 0,
-                Self::arrow => 0,
-                Self::artillery_flare => 0,
-                Self::artillery_projectile => 0,
-                Self::artillery_turret => 0,
-                Self::artillery_wagon => 0,
-                Self::assembling_machine => 0,
-                Self::beacon => 0,
-                Self::beam => 0,
-                Self::boiler => 0,
-                Self::burner_generator => 0,
-                Self::car => 0,
-                Self::cargo_wagon => 0,
-                Self::character => 0,
-                Self::character_corpse => 0,
-                Self::cliff => 0,
-                Self::combat_robot => 0,
-                Self::constant_combinator => 0,
-                Self::construction_robot => 0,
-                Self::container => 0,
-                Self::corpse => 0,
-                Self::curved_rail => 0,
-                Self::decider_combinator => 0,
-                Self::deconstructible_tile_proxy => 0,
-                Self::electric_energy_interface => 0,
-                Self::electric_pole => 0,
-                Self::electric_turret => 0,
-                Self::entity_ghost => 0,
-                Self::explosion => 0,
-                Self::fire => 0,
-                Self::fish => 0,
-                Self::flame_thrower_explosion => 0,
-                Self::fluid_turret => 0,
-                Self::fluid_wagon => 0,
-                Self::flying_text => 0,
-                Self::furnace => 0,
-                Self::gate => 0,
-                Self::generator => 0,
-                Self::heat_interface => 0,
-                Self::heat_pipe => 0,
-                Self::highlight_box => 0,
-                Self::infinity_container => 0,
-                Self::infinity_pipe => 0,
-                Self::inserter => 0,
-                Self::item_entity => 0,
-                Self::item_request_proxy => 0,
-                Self::lab => 0,
-                Self::lamp => 0,
-                Self::land_mine => 0,
-                Self::leaf_particle => 0,
-                Self::linked_belt => 0,
-                Self::linked_container => 0,
-                Self::loader => 0,
-                Self::loader_1x1 => 0,
-                Self::locomotive => 0,
-                Self::logistic_container => 0,
-                Self::logistic_robot => 0,
-                Self::market => 0,
-                Self::mining_drill => 0,
-                Self::offshore_pump => 0,
-                Self::particle => 0,
-                Self::particle_source => 0,
-                Self::pipe => 0,
-                Self::pipe_to_ground => 0,
-                Self::player_port => 0,
-                Self::power_switch => 0,
-                Self::programmable_speaker => 0,
-                Self::projectile => 0,
-                Self::pump => 0,
-                Self::radar => 0,
-                Self::rail_chain_signal => 0,
-                Self::rail_remnants => 0,
-                Self::rail_signal => 0,
-                Self::reactor => 0,
-                Self::resource => 0,
-                Self::roboport => 0,
-                Self::rocket_silo => 0,
-                Self::rocket_silo_rocket => 0,
-                Self::rocket_silo_rocket_shadow => 0,
-                Self::simple_entity => 0,
-                Self::simple_entity_with_force => 0,
-                Self::simple_entity_with_owner => 0,
-                Self::smoke => 0,
-                Self::smoke_with_trigger => 0,
-                Self::solar_panel => 0,
-                Self::speech_bubble => 0,
-                Self::spider_leg => 0,
-                Self::spider_vehicle => 0,
-                Self::splitter => 0,
-                Self::sticker => 0,
-                Self::storage_tank => 0,
-                Self::straight_rail => 0,
-                Self::stream => 0,
-                Self::tile_ghost => 0,
-                Self::train_stop => 0,
-                Self::transport_belt => 0,
-                Self::tree => 0,
-                Self::turret => 0,
-                Self::underground_belt => 0,
-                Self::unit => 0,
-                Self::unit_spawner => 0,
-                Self::wall => 0,
-            }
+    impl std::ops::Deref for entity {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 104] = [
+                0, // accumulator
+                0, // ammo-turret
+                0, // arithmetic-combinator
+                0, // arrow
+                0, // artillery-flare
+                0, // artillery-projectile
+                0, // artillery-turret
+                0, // artillery-wagon
+                0, // assembling-machine
+                0, // beacon
+                0, // beam
+                0, // boiler
+                0, // burner-generator
+                0, // car
+                0, // cargo-wagon
+                0, // character
+                0, // character-corpse
+                0, // cliff
+                0, // combat-robot
+                0, // constant-combinator
+                0, // construction-robot
+                0, // container
+                0, // corpse
+                0, // curved-rail
+                0, // decider-combinator
+                0, // deconstructible-tile-proxy
+                0, // electric-energy-interface
+                0, // electric-pole
+                0, // electric-turret
+                0, // entity-ghost
+                0, // explosion
+                0, // fire
+                0, // fish
+                0, // flame-thrower-explosion
+                0, // fluid-turret
+                0, // fluid-wagon
+                0, // flying-text
+                0, // furnace
+                0, // gate
+                0, // generator
+                0, // heat-interface
+                0, // heat-pipe
+                0, // highlight-box
+                0, // infinity-container
+                0, // infinity-pipe
+                0, // inserter
+                0, // item-entity
+                0, // item-request-proxy
+                0, // lab
+                0, // lamp
+                0, // land-mine
+                0, // leaf-particle
+                0, // linked-belt
+                0, // linked-container
+                0, // loader
+                0, // loader-1x1
+                0, // locomotive
+                0, // logistic-container
+                0, // logistic-robot
+                0, // market
+                0, // mining-drill
+                0, // offshore-pump
+                0, // particle
+                0, // particle-source
+                0, // pipe
+                0, // pipe-to-ground
+                0, // player-port
+                0, // power-switch
+                0, // programmable-speaker
+                0, // projectile
+                0, // pump
+                0, // radar
+                0, // rail-chain-signal
+                0, // rail-remnants
+                0, // rail-signal
+                0, // reactor
+                0, // resource
+                0, // roboport
+                0, // rocket-silo
+                0, // rocket-silo-rocket
+                0, // rocket-silo-rocket-shadow
+                0, // simple-entity
+                0, // simple-entity-with-force
+                0, // simple-entity-with-owner
+                0, // smoke
+                0, // smoke-with-trigger
+                0, // solar-panel
+                0, // speech-bubble
+                0, // spider-leg
+                0, // spider-vehicle
+                0, // splitter
+                0, // sticker
+                0, // storage-tank
+                0, // straight-rail
+                0, // stream
+                0, // tile-ghost
+                0, // train-stop
+                0, // transport-belt
+                0, // tree
+                0, // turret
+                0, // underground-belt
+                0, // unit
+                0, // unit-spawner
+                0, // wall
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for entity {
         fn key(&self) -> &'static str {
             match self {
                 Self::accumulator => "accumulator",
@@ -4910,20 +5160,24 @@ pub mod prototypes {
         roboport_equipment,
         solar_panel_equipment,
     }
-    impl crate::defines::Defines<u8> for equipment {
-        fn value(&self) -> u8 {
-            match self {
-                Self::active_defense_equipment => 0,
-                Self::battery_equipment => 0,
-                Self::belt_immunity_equipment => 0,
-                Self::energy_shield_equipment => 0,
-                Self::generator_equipment => 0,
-                Self::movement_bonus_equipment => 0,
-                Self::night_vision_equipment => 0,
-                Self::roboport_equipment => 0,
-                Self::solar_panel_equipment => 0,
-            }
+    impl std::ops::Deref for equipment {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 9] = [
+                0, // active-defense-equipment
+                0, // battery-equipment
+                0, // belt-immunity-equipment
+                0, // energy-shield-equipment
+                0, // generator-equipment
+                0, // movement-bonus-equipment
+                0, // night-vision-equipment
+                0, // roboport-equipment
+                0, // solar-panel-equipment
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for equipment {
         fn key(&self) -> &'static str {
             match self {
                 Self::active_defense_equipment => "active-defense-equipment",
@@ -4955,12 +5209,16 @@ pub mod prototypes {
     pub enum equipment_category {
         equipment_category,
     }
-    impl crate::defines::Defines<u8> for equipment_category {
-        fn value(&self) -> u8 {
-            match self {
-                Self::equipment_category => 0,
-            }
+    impl std::ops::Deref for equipment_category {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // equipment-category
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for equipment_category {
         fn key(&self) -> &'static str {
             match self {
                 Self::equipment_category => "equipment-category",
@@ -4976,12 +5234,16 @@ pub mod prototypes {
     pub enum equipment_grid {
         equipment_grid,
     }
-    impl crate::defines::Defines<u8> for equipment_grid {
-        fn value(&self) -> u8 {
-            match self {
-                Self::equipment_grid => 0,
-            }
+    impl std::ops::Deref for equipment_grid {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // equipment-grid
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for equipment_grid {
         fn key(&self) -> &'static str {
             match self {
                 Self::equipment_grid => "equipment-grid",
@@ -4997,12 +5259,16 @@ pub mod prototypes {
     pub enum fluid {
         fluid,
     }
-    impl crate::defines::Defines<u8> for fluid {
-        fn value(&self) -> u8 {
-            match self {
-                Self::fluid => 0,
-            }
+    impl std::ops::Deref for fluid {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // fluid
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for fluid {
         fn key(&self) -> &'static str {
             match self {
                 Self::fluid => "fluid",
@@ -5018,12 +5284,16 @@ pub mod prototypes {
     pub enum font {
         font,
     }
-    impl crate::defines::Defines<u8> for font {
-        fn value(&self) -> u8 {
-            match self {
-                Self::font => 0,
-            }
+    impl std::ops::Deref for font {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // font
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for font {
         fn key(&self) -> &'static str {
             match self {
                 Self::font => "font",
@@ -5039,12 +5309,16 @@ pub mod prototypes {
     pub enum fuel_category {
         fuel_category,
     }
-    impl crate::defines::Defines<u8> for fuel_category {
-        fn value(&self) -> u8 {
-            match self {
-                Self::fuel_category => 0,
-            }
+    impl std::ops::Deref for fuel_category {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // fuel-category
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for fuel_category {
         fn key(&self) -> &'static str {
             match self {
                 Self::fuel_category => "fuel-category",
@@ -5060,12 +5334,16 @@ pub mod prototypes {
     pub enum god_controller {
         god_controller,
     }
-    impl crate::defines::Defines<u8> for god_controller {
-        fn value(&self) -> u8 {
-            match self {
-                Self::god_controller => 0,
-            }
+    impl std::ops::Deref for god_controller {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // god-controller
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for god_controller {
         fn key(&self) -> &'static str {
             match self {
                 Self::god_controller => "god-controller",
@@ -5081,12 +5359,16 @@ pub mod prototypes {
     pub enum gui_style {
         gui_style,
     }
-    impl crate::defines::Defines<u8> for gui_style {
-        fn value(&self) -> u8 {
-            match self {
-                Self::gui_style => 0,
-            }
+    impl std::ops::Deref for gui_style {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // gui-style
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for gui_style {
         fn key(&self) -> &'static str {
             match self {
                 Self::gui_style => "gui-style",
@@ -5122,32 +5404,36 @@ pub mod prototypes {
         tool,
         upgrade_item,
     }
-    impl crate::defines::Defines<u8> for item {
-        fn value(&self) -> u8 {
-            match self {
-                Self::ammo => 0,
-                Self::armor => 0,
-                Self::blueprint => 0,
-                Self::blueprint_book => 0,
-                Self::capsule => 0,
-                Self::copy_paste_tool => 0,
-                Self::deconstruction_item => 0,
-                Self::gun => 0,
-                Self::item => 0,
-                Self::item_with_entity_data => 0,
-                Self::item_with_inventory => 0,
-                Self::item_with_label => 0,
-                Self::item_with_tags => 0,
-                Self::mining_tool => 0,
-                Self::module => 0,
-                Self::rail_planner => 0,
-                Self::repair_tool => 0,
-                Self::selection_tool => 0,
-                Self::spidertron_remote => 0,
-                Self::tool => 0,
-                Self::upgrade_item => 0,
-            }
+    impl std::ops::Deref for item {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 21] = [
+                0, // ammo
+                0, // armor
+                0, // blueprint
+                0, // blueprint-book
+                0, // capsule
+                0, // copy-paste-tool
+                0, // deconstruction-item
+                0, // gun
+                0, // item
+                0, // item-with-entity-data
+                0, // item-with-inventory
+                0, // item-with-label
+                0, // item-with-tags
+                0, // mining-tool
+                0, // module
+                0, // rail-planner
+                0, // repair-tool
+                0, // selection-tool
+                0, // spidertron-remote
+                0, // tool
+                0, // upgrade-item
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for item {
         fn key(&self) -> &'static str {
             match self {
                 Self::ammo => "ammo",
@@ -5203,12 +5489,16 @@ pub mod prototypes {
     pub enum item_group {
         item_group,
     }
-    impl crate::defines::Defines<u8> for item_group {
-        fn value(&self) -> u8 {
-            match self {
-                Self::item_group => 0,
-            }
+    impl std::ops::Deref for item_group {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // item-group
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for item_group {
         fn key(&self) -> &'static str {
             match self {
                 Self::item_group => "item-group",
@@ -5224,12 +5514,16 @@ pub mod prototypes {
     pub enum item_subgroup {
         item_subgroup,
     }
-    impl crate::defines::Defines<u8> for item_subgroup {
-        fn value(&self) -> u8 {
-            match self {
-                Self::item_subgroup => 0,
-            }
+    impl std::ops::Deref for item_subgroup {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // item-subgroup
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for item_subgroup {
         fn key(&self) -> &'static str {
             match self {
                 Self::item_subgroup => "item-subgroup",
@@ -5245,12 +5539,16 @@ pub mod prototypes {
     pub enum map_gen_presets {
         map_gen_presets,
     }
-    impl crate::defines::Defines<u8> for map_gen_presets {
-        fn value(&self) -> u8 {
-            match self {
-                Self::map_gen_presets => 0,
-            }
+    impl std::ops::Deref for map_gen_presets {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // map-gen-presets
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for map_gen_presets {
         fn key(&self) -> &'static str {
             match self {
                 Self::map_gen_presets => "map-gen-presets",
@@ -5266,12 +5564,16 @@ pub mod prototypes {
     pub enum map_settings {
         map_settings,
     }
-    impl crate::defines::Defines<u8> for map_settings {
-        fn value(&self) -> u8 {
-            match self {
-                Self::map_settings => 0,
-            }
+    impl std::ops::Deref for map_settings {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // map-settings
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for map_settings {
         fn key(&self) -> &'static str {
             match self {
                 Self::map_settings => "map-settings",
@@ -5287,12 +5589,16 @@ pub mod prototypes {
     pub enum module_category {
         module_category,
     }
-    impl crate::defines::Defines<u8> for module_category {
-        fn value(&self) -> u8 {
-            match self {
-                Self::module_category => 0,
-            }
+    impl std::ops::Deref for module_category {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // module-category
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for module_category {
         fn key(&self) -> &'static str {
             match self {
                 Self::module_category => "module-category",
@@ -5308,12 +5614,16 @@ pub mod prototypes {
     pub enum mouse_cursor {
         mouse_cursor,
     }
-    impl crate::defines::Defines<u8> for mouse_cursor {
-        fn value(&self) -> u8 {
-            match self {
-                Self::mouse_cursor => 0,
-            }
+    impl std::ops::Deref for mouse_cursor {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // mouse-cursor
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for mouse_cursor {
         fn key(&self) -> &'static str {
             match self {
                 Self::mouse_cursor => "mouse-cursor",
@@ -5329,12 +5639,16 @@ pub mod prototypes {
     pub enum noise_expression {
         noise_expression,
     }
-    impl crate::defines::Defines<u8> for noise_expression {
-        fn value(&self) -> u8 {
-            match self {
-                Self::noise_expression => 0,
-            }
+    impl std::ops::Deref for noise_expression {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // noise-expression
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for noise_expression {
         fn key(&self) -> &'static str {
             match self {
                 Self::noise_expression => "noise-expression",
@@ -5350,12 +5664,16 @@ pub mod prototypes {
     pub enum noise_layer {
         noise_layer,
     }
-    impl crate::defines::Defines<u8> for noise_layer {
-        fn value(&self) -> u8 {
-            match self {
-                Self::noise_layer => 0,
-            }
+    impl std::ops::Deref for noise_layer {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // noise-layer
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for noise_layer {
         fn key(&self) -> &'static str {
             match self {
                 Self::noise_layer => "noise-layer",
@@ -5371,12 +5689,16 @@ pub mod prototypes {
     pub enum particle {
         optimized_particle,
     }
-    impl crate::defines::Defines<u8> for particle {
-        fn value(&self) -> u8 {
-            match self {
-                Self::optimized_particle => 0,
-            }
+    impl std::ops::Deref for particle {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // optimized-particle
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for particle {
         fn key(&self) -> &'static str {
             match self {
                 Self::optimized_particle => "optimized-particle",
@@ -5392,12 +5714,16 @@ pub mod prototypes {
     pub enum recipe {
         recipe,
     }
-    impl crate::defines::Defines<u8> for recipe {
-        fn value(&self) -> u8 {
-            match self {
-                Self::recipe => 0,
-            }
+    impl std::ops::Deref for recipe {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // recipe
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for recipe {
         fn key(&self) -> &'static str {
             match self {
                 Self::recipe => "recipe",
@@ -5413,12 +5739,16 @@ pub mod prototypes {
     pub enum recipe_category {
         recipe_category,
     }
-    impl crate::defines::Defines<u8> for recipe_category {
-        fn value(&self) -> u8 {
-            match self {
-                Self::recipe_category => 0,
-            }
+    impl std::ops::Deref for recipe_category {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // recipe-category
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for recipe_category {
         fn key(&self) -> &'static str {
             match self {
                 Self::recipe_category => "recipe-category",
@@ -5434,12 +5764,16 @@ pub mod prototypes {
     pub enum resource_category {
         resource_category,
     }
-    impl crate::defines::Defines<u8> for resource_category {
-        fn value(&self) -> u8 {
-            match self {
-                Self::resource_category => 0,
-            }
+    impl std::ops::Deref for resource_category {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // resource-category
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for resource_category {
         fn key(&self) -> &'static str {
             match self {
                 Self::resource_category => "resource-category",
@@ -5455,12 +5789,16 @@ pub mod prototypes {
     pub enum shortcut {
         shortcut,
     }
-    impl crate::defines::Defines<u8> for shortcut {
-        fn value(&self) -> u8 {
-            match self {
-                Self::shortcut => 0,
-            }
+    impl std::ops::Deref for shortcut {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // shortcut
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for shortcut {
         fn key(&self) -> &'static str {
             match self {
                 Self::shortcut => "shortcut",
@@ -5476,12 +5814,16 @@ pub mod prototypes {
     pub enum sound {
         sound,
     }
-    impl crate::defines::Defines<u8> for sound {
-        fn value(&self) -> u8 {
-            match self {
-                Self::sound => 0,
-            }
+    impl std::ops::Deref for sound {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // sound
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for sound {
         fn key(&self) -> &'static str {
             match self {
                 Self::sound => "sound",
@@ -5497,12 +5839,16 @@ pub mod prototypes {
     pub enum spectator_controller {
         spectator_controller,
     }
-    impl crate::defines::Defines<u8> for spectator_controller {
-        fn value(&self) -> u8 {
-            match self {
-                Self::spectator_controller => 0,
-            }
+    impl std::ops::Deref for spectator_controller {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // spectator-controller
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for spectator_controller {
         fn key(&self) -> &'static str {
             match self {
                 Self::spectator_controller => "spectator-controller",
@@ -5518,12 +5864,16 @@ pub mod prototypes {
     pub enum sprite {
         sprite,
     }
-    impl crate::defines::Defines<u8> for sprite {
-        fn value(&self) -> u8 {
-            match self {
-                Self::sprite => 0,
-            }
+    impl std::ops::Deref for sprite {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // sprite
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for sprite {
         fn key(&self) -> &'static str {
             match self {
                 Self::sprite => "sprite",
@@ -5539,12 +5889,16 @@ pub mod prototypes {
     pub enum technology {
         technology,
     }
-    impl crate::defines::Defines<u8> for technology {
-        fn value(&self) -> u8 {
-            match self {
-                Self::technology => 0,
-            }
+    impl std::ops::Deref for technology {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // technology
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for technology {
         fn key(&self) -> &'static str {
             match self {
                 Self::technology => "technology",
@@ -5560,12 +5914,16 @@ pub mod prototypes {
     pub enum tile {
         tile,
     }
-    impl crate::defines::Defines<u8> for tile {
-        fn value(&self) -> u8 {
-            match self {
-                Self::tile => 0,
-            }
+    impl std::ops::Deref for tile {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // tile
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for tile {
         fn key(&self) -> &'static str {
             match self {
                 Self::tile => "tile",
@@ -5581,12 +5939,16 @@ pub mod prototypes {
     pub enum tile_effect {
         tile_effect,
     }
-    impl crate::defines::Defines<u8> for tile_effect {
-        fn value(&self) -> u8 {
-            match self {
-                Self::tile_effect => 0,
-            }
+    impl std::ops::Deref for tile_effect {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // tile-effect
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for tile_effect {
         fn key(&self) -> &'static str {
             match self {
                 Self::tile_effect => "tile-effect",
@@ -5602,12 +5964,16 @@ pub mod prototypes {
     pub enum tips_and_tricks_item {
         tips_and_tricks_item,
     }
-    impl crate::defines::Defines<u8> for tips_and_tricks_item {
-        fn value(&self) -> u8 {
-            match self {
-                Self::tips_and_tricks_item => 0,
-            }
+    impl std::ops::Deref for tips_and_tricks_item {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // tips-and-tricks-item
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for tips_and_tricks_item {
         fn key(&self) -> &'static str {
             match self {
                 Self::tips_and_tricks_item => "tips-and-tricks-item",
@@ -5623,12 +5989,16 @@ pub mod prototypes {
     pub enum tips_and_tricks_item_category {
         tips_and_tricks_item_category,
     }
-    impl crate::defines::Defines<u8> for tips_and_tricks_item_category {
-        fn value(&self) -> u8 {
-            match self {
-                Self::tips_and_tricks_item_category => 0,
-            }
+    impl std::ops::Deref for tips_and_tricks_item_category {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // tips-and-tricks-item-category
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for tips_and_tricks_item_category {
         fn key(&self) -> &'static str {
             match self {
                 Self::tips_and_tricks_item_category => "tips-and-tricks-item-category",
@@ -5644,12 +6014,16 @@ pub mod prototypes {
     pub enum trigger_target_type {
         trigger_target_type,
     }
-    impl crate::defines::Defines<u8> for trigger_target_type {
-        fn value(&self) -> u8 {
-            match self {
-                Self::trigger_target_type => 0,
-            }
+    impl std::ops::Deref for trigger_target_type {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // trigger-target-type
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for trigger_target_type {
         fn key(&self) -> &'static str {
             match self {
                 Self::trigger_target_type => "trigger-target-type",
@@ -5665,12 +6039,16 @@ pub mod prototypes {
     pub enum trivial_smoke {
         trivial_smoke,
     }
-    impl crate::defines::Defines<u8> for trivial_smoke {
-        fn value(&self) -> u8 {
-            match self {
-                Self::trivial_smoke => 0,
-            }
+    impl std::ops::Deref for trivial_smoke {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // trivial-smoke
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for trivial_smoke {
         fn key(&self) -> &'static str {
             match self {
                 Self::trivial_smoke => "trivial-smoke",
@@ -5686,12 +6064,16 @@ pub mod prototypes {
     pub enum tutorial {
         tutorial,
     }
-    impl crate::defines::Defines<u8> for tutorial {
-        fn value(&self) -> u8 {
-            match self {
-                Self::tutorial => 0,
-            }
+    impl std::ops::Deref for tutorial {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // tutorial
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for tutorial {
         fn key(&self) -> &'static str {
             match self {
                 Self::tutorial => "tutorial",
@@ -5707,12 +6089,16 @@ pub mod prototypes {
     pub enum utility_constants {
         utility_constants,
     }
-    impl crate::defines::Defines<u8> for utility_constants {
-        fn value(&self) -> u8 {
-            match self {
-                Self::utility_constants => 0,
-            }
+    impl std::ops::Deref for utility_constants {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // utility-constants
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for utility_constants {
         fn key(&self) -> &'static str {
             match self {
                 Self::utility_constants => "utility-constants",
@@ -5728,12 +6114,16 @@ pub mod prototypes {
     pub enum utility_sounds {
         utility_sounds,
     }
-    impl crate::defines::Defines<u8> for utility_sounds {
-        fn value(&self) -> u8 {
-            match self {
-                Self::utility_sounds => 0,
-            }
+    impl std::ops::Deref for utility_sounds {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // utility-sounds
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for utility_sounds {
         fn key(&self) -> &'static str {
             match self {
                 Self::utility_sounds => "utility-sounds",
@@ -5749,12 +6139,16 @@ pub mod prototypes {
     pub enum utility_sprites {
         utility_sprites,
     }
-    impl crate::defines::Defines<u8> for utility_sprites {
-        fn value(&self) -> u8 {
-            match self {
-                Self::utility_sprites => 0,
-            }
+    impl std::ops::Deref for utility_sprites {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // utility-sprites
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for utility_sprites {
         fn key(&self) -> &'static str {
             match self {
                 Self::utility_sprites => "utility-sprites",
@@ -5770,12 +6164,16 @@ pub mod prototypes {
     pub enum virtual_signal {
         virtual_signal,
     }
-    impl crate::defines::Defines<u8> for virtual_signal {
-        fn value(&self) -> u8 {
-            match self {
-                Self::virtual_signal => 0,
-            }
+    impl std::ops::Deref for virtual_signal {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // virtual-signal
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for virtual_signal {
         fn key(&self) -> &'static str {
             match self {
                 Self::virtual_signal => "virtual-signal",
@@ -5791,12 +6189,16 @@ pub mod prototypes {
     pub enum wind_sound {
         wind_sound,
     }
-    impl crate::defines::Defines<u8> for wind_sound {
-        fn value(&self) -> u8 {
-            match self {
-                Self::wind_sound => 0,
-            }
+    impl std::ops::Deref for wind_sound {
+        type Target = u8;
+        fn deref(&self) -> &'static u8 {
+            const VALUES: [u8; 1] = [
+                0, // wind-sound
+            ];
+            &VALUES[*self as usize]
         }
+    }
+    impl crate::defines::Defines<u8> for wind_sound {
         fn key(&self) -> &'static str {
             match self {
                 Self::wind_sound => "wind-sound",
@@ -5816,14 +6218,18 @@ pub enum print_sound {
     never,
     use_player_settings,
 }
-impl crate::defines::Defines<u8> for print_sound {
-    fn value(&self) -> u8 {
-        match self {
-            Self::always => 1,
-            Self::never => 0,
-            Self::use_player_settings => 2,
-        }
+impl std::ops::Deref for print_sound {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 3] = [
+            1, // always
+            0, // never
+            2, // use_player_settings
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for print_sound {
     fn key(&self) -> &'static str {
         match self {
             Self::always => "always",
@@ -5846,14 +6252,18 @@ pub enum print_skip {
     if_redundant,
     if_visible,
 }
-impl crate::defines::Defines<u8> for print_skip {
-    fn value(&self) -> u8 {
-        match self {
-            Self::never => 0,
-            Self::if_redundant => 1,
-            Self::if_visible => 2,
-        }
+impl std::ops::Deref for print_skip {
+    type Target = u8;
+    fn deref(&self) -> &'static u8 {
+        const VALUES: [u8; 3] = [
+            0, // never
+            1, // if_redundant
+            2, // if_visible
+        ];
+        &VALUES[*self as usize]
     }
+}
+impl crate::defines::Defines<u8> for print_skip {
     fn key(&self) -> &'static str {
         match self {
             Self::never => "never",
