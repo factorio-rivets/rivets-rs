@@ -4,6 +4,7 @@
 #![allow(clippy::match_same_arms)]
 #![allow(non_camel_case_types)]
 #![allow(unreachable_patterns)]
+#![allow(missing_docs)]
 
 pub trait Define<const COUNT: usize>: std::ops::Deref {
     fn variants() -> &'static [Self; COUNT]
