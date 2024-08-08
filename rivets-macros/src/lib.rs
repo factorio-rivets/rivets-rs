@@ -49,9 +49,9 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
     let name = &input.sig.ident;
     let return_type = &input.sig.output;
 
-    let arguments: Vec<proc_macro2::TokenStream> = input
-        .sig
-        .inputs
+    let inputs = &input.sig.inputs;
+    let mut arg_names : Vec<proc_macro2::TokenStream> = vec![];
+    let arguments: Vec<proc_macro2::TokenStream> = inputs
         .iter()
         .map(|arg| match arg {
             FnArg::Receiver(_) => {
@@ -60,11 +60,14 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
             FnArg::Typed(pat) => {
                 let attrs = &pat.attrs;
                 let ty = &pat.ty;
+                let pat = &pat.pat;
+                arg_names.push(quote! { #pat });
                 quote! { #(#attrs)* #ty }
             }
         })
         .collect();
     let arguments = quote! { #( #arguments ),* };
+    let arg_names = quote! { #( #arg_names ),* };
 
     let calling_convention = match determine_calling_convention(&input, &unmangled_name) {
         Ok(calling_convention) => calling_convention,
@@ -77,10 +80,18 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
         unsafe #calling_convention fn(#arguments) #return_type
     };
 
+    let source = quote! {
+        unsafe fn source(#inputs) #return_type {
+            Detour.call(#arg_names)
+        }
+    };
+
     let result = quote! {
         retour::static_detour! {
             static Detour : #cpp_function_header;
         }
+
+        #source
 
         #[doc = #unmangled_name]
         #callback
