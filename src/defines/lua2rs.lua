@@ -106,6 +106,7 @@ local header = '#![allow(clippy::wildcard_imports)]\n' ..
     '#![allow(clippy::enum_variant_names)]\n' ..
     '#![allow(clippy::too_many_lines)]\n' ..
     '#![allow(clippy::match_same_arms)]\n' ..
+    '#![allow(unreachable_patterns)]\n' ..
     '#![allow(non_camel_case_types)]\n\n' ..
     'pub trait Define<const COUNT: usize>: std::ops::Deref {\n' ..
     '    fn variants() -> &\'static [Self; COUNT] where Self: Sized;\n' ..

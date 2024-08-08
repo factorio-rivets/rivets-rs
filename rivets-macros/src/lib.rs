@@ -50,7 +50,7 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
     let return_type = &input.sig.output;
 
     let inputs = &input.sig.inputs;
-    let mut arg_names : Vec<proc_macro2::TokenStream> = vec![];
+    let mut arg_names: Vec<proc_macro2::TokenStream> = vec![];
     let arguments: Vec<proc_macro2::TokenStream> = inputs
         .iter()
         .map(|arg| match arg {
@@ -136,6 +136,7 @@ pub fn define_derive(input: TokenStream) -> TokenStream {
 
     let count = data.variants.len();
     let mut deref_matches = TokenStream2::new();
+    let mut from_matches = TokenStream2::new();
     let mut variants = TokenStream2::new();
 
     for variant in data.variants {
@@ -168,10 +169,39 @@ pub fn define_derive(input: TokenStream) -> TokenStream {
             Self::#ident => &#value,
         }));
 
+        from_matches.extend(std::iter::once(quote! {
+            #value => Ok(Self::#ident),
+        }));
+
         variants.extend(std::iter::once(quote! {
             Self::#ident,
         }));
     }
+
+    let impl_from = {
+        let kind = if format!("{kind}").eq("str") {
+            quote! {
+                &#kind
+            }
+        } else {
+            quote! {
+                #kind
+            }
+        };
+
+        quote! {
+            impl std::convert::TryFrom<#kind> for #ident {
+                type Error = &'static str;
+
+                fn try_from(value: #kind) -> Result<Self, Self::Error> {
+                    match value {
+                        #from_matches
+                        _ => Err("Invalid value"),
+                    }
+                }
+            }
+        }
+    };
 
     let output = quote! {
         impl std::ops::Deref for #ident {
@@ -183,6 +213,8 @@ pub fn define_derive(input: TokenStream) -> TokenStream {
                 }
             }
         }
+
+        #impl_from
 
         impl Define<#count> for #ident {
             fn variants() -> &'static [Self; #count] {
