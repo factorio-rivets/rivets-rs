@@ -4,13 +4,13 @@ use anyhow::{bail, Result};
 use darling::FromDeriveInput;
 use lazy_regex::regex;
 use proc_macro::{self, Diagnostic, Level, Span, TokenStream};
-use proc_macro2::{Span, TokenStream as TokenStream2};
+use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{parse_macro_input, Abi, DeriveInput, Error, Expr, FnArg, Ident, ItemFn, Variant};
 
 macro_rules! derive_error {
     ($string: tt) => {
-        Error::new(Span::call_site(), $string)
+        Error::new(proc_macro2::Span::call_site(), $string)
             .to_compile_error()
             .into()
     };
@@ -83,11 +83,11 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
 
         unsafe fn hook(address: u64) -> anyhow::Result<()> {
             retour::static_detour! {
-                static Detour: #cpp_function_header;
+                static #name : #cpp_function_header;
             }
 
             let compiled_function: #cpp_function_header = std::mem::transmute(address);
-            Detour.initialize(compiled_function, #name)?.enable()?;
+            #name.initialize(compiled_function, #name)?.enable()?;
             Ok(())
         }
 
@@ -134,7 +134,7 @@ pub fn define_derive(input: TokenStream) -> TokenStream {
                 continue;
             };
 
-            if !nv.path.is_ident("value".into()) {
+            if !nv.path.is_ident::<str>("value") {
                 continue;
             }
 
@@ -166,14 +166,14 @@ pub fn define_derive(input: TokenStream) -> TokenStream {
         impl std::ops::Deref for #ident {
             type Target = #kind;
 
-            fn deref(&self) -> &'static Self::Target {
+            fn deref(&self) -> &'static #kind {
                 match self {
                     #deref_matches
                 }
             }
         }
 
-        impl Define<#kind, #count> for #ident {
+        impl Define<#count> for #ident {
             fn variants() -> &'static [Self; #count] {
                 &[
                     #variants

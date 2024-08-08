@@ -1,15 +1,13 @@
-#![allow(clippy::enum_variant_names)]
+#![allow(clippy::wildcard_imports)]#![allow(clippy::enum_variant_names)]
 #![allow(clippy::too_many_lines)]
 #![allow(clippy::match_same_arms)]
 #![allow(non_camel_case_types)]
 
-use rivets_macros::FactorioDefine;
-
-pub trait Define<T, const COUNT: usize>: std::ops::Deref<Target = T> {
+pub trait Define<const COUNT: usize>: std::ops::Deref {
     fn variants() -> &'static [Self; COUNT] where Self: Sized;
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum inventory {
     #[value = 1]
@@ -105,7 +103,7 @@ pub enum inventory {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum transport_line {
     #[value = 1]
@@ -131,7 +129,7 @@ pub enum transport_line {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum direction {
     #[value = 0]
@@ -154,7 +152,9 @@ pub enum direction {
 
 
 pub mod riding {
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    use super::*;
+
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum acceleration {
         #[value = 0]
@@ -167,7 +167,7 @@ pub mod riding {
         reversing,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum direction {
         #[value = 0]
@@ -180,7 +180,7 @@ pub mod riding {
     
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum shooting {
     #[value = 0]
@@ -192,7 +192,7 @@ pub enum shooting {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum command {
     #[value = 1]
@@ -216,7 +216,7 @@ pub enum command {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum distraction {
     #[value = 0]
@@ -230,7 +230,7 @@ pub enum distraction {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum compound_command {
     #[value = 0]
@@ -242,7 +242,7 @@ pub enum compound_command {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum difficulty {
     #[value = 0]
@@ -255,7 +255,9 @@ pub enum difficulty {
 
 
 pub mod difficulty_settings {
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    use super::*;
+
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum recipe_difficulty {
         #[value = 0]
@@ -264,7 +266,7 @@ pub mod difficulty_settings {
         expensive,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum technology_difficulty {
         #[value = 0]
@@ -275,7 +277,7 @@ pub mod difficulty_settings {
     
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum events {
     #[value = 183]
@@ -649,7 +651,7 @@ pub enum events {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum controllers {
     #[value = 0]
@@ -667,7 +669,7 @@ pub enum controllers {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum group_state {
     #[value = 0]
@@ -687,7 +689,7 @@ pub enum group_state {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum wire_type {
     #[value = 2]
@@ -699,7 +701,7 @@ pub enum wire_type {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum circuit_connector_id {
     #[value = 1]
@@ -739,7 +741,7 @@ pub enum circuit_connector_id {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum circuit_condition_index {
     #[value = 1]
@@ -761,7 +763,7 @@ pub enum circuit_condition_index {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum wire_connection_id {
     #[value = 0]
@@ -773,7 +775,7 @@ pub enum wire_connection_id {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum train_state {
     #[value = 0]
@@ -801,7 +803,7 @@ pub enum train_state {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum signal_state {
     #[value = 0]
@@ -815,7 +817,7 @@ pub enum signal_state {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum chain_signal_state {
     #[value = 0]
@@ -829,7 +831,7 @@ pub enum chain_signal_state {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum rail_direction {
     #[value = 0]
@@ -839,7 +841,7 @@ pub enum rail_direction {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum rail_connection_direction {
     #[value = 0]
@@ -854,8 +856,12 @@ pub enum rail_connection_direction {
 
 
 pub mod control_behavior {
+    use super::*;
+
     pub mod inserter {
-        #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+        use super::*;
+    
+        #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
         #[factorio_define(kind = u8)]
         pub enum circuit_mode_of_operation {
             #[value = 3]
@@ -870,7 +876,7 @@ pub mod control_behavior {
             set_stack_size,
         }
         
-        #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+        #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
         #[factorio_define(kind = u8)]
         pub enum hand_read_mode {
             #[value = 1]
@@ -881,7 +887,9 @@ pub mod control_behavior {
         
     }
     pub mod logistic_container {
-        #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+        use super::*;
+    
+        #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
         #[factorio_define(kind = u8)]
         pub enum circuit_mode_of_operation {
             #[value = 0]
@@ -892,7 +900,9 @@ pub mod control_behavior {
         
     }
     pub mod lamp {
-        #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+        use super::*;
+    
+        #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
         #[factorio_define(kind = u8)]
         pub enum circuit_mode_of_operation {
             #[value = 0]
@@ -901,7 +911,9 @@ pub mod control_behavior {
         
     }
     pub mod mining_drill {
-        #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+        use super::*;
+    
+        #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
         #[factorio_define(kind = u8)]
         pub enum resource_read_mode {
             #[value = 0]
@@ -912,7 +924,9 @@ pub mod control_behavior {
         
     }
     pub mod transport_belt {
-        #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+        use super::*;
+    
+        #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
         #[factorio_define(kind = u8)]
         pub enum content_read_mode {
             #[value = 0]
@@ -922,7 +936,7 @@ pub mod control_behavior {
         }
         
     }
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum r#type {
         #[value = 1]
@@ -965,7 +979,7 @@ pub mod control_behavior {
     
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum chunk_generated_status {
     #[value = 0]
@@ -983,7 +997,7 @@ pub enum chunk_generated_status {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum logistic_mode {
     #[value = 0]
@@ -1001,7 +1015,7 @@ pub enum logistic_mode {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum logistic_member_index {
     #[value = 0]
@@ -1020,7 +1034,9 @@ pub enum logistic_member_index {
 
 
 pub mod deconstruction_item {
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    use super::*;
+
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum entity_filter_mode {
         #[value = 0]
@@ -1029,7 +1045,7 @@ pub mod deconstruction_item {
         blacklist,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum tile_filter_mode {
         #[value = 0]
@@ -1038,7 +1054,7 @@ pub mod deconstruction_item {
         blacklist,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum tile_selection_mode {
         #[value = 0]
@@ -1053,7 +1069,7 @@ pub mod deconstruction_item {
     
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum alert_type {
     #[value = 0]
@@ -1077,7 +1093,7 @@ pub enum alert_type {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum mouse_button_type {
     #[value = 1]
@@ -1091,7 +1107,7 @@ pub enum mouse_button_type {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum input_action {
     #[value = 45]
@@ -1503,7 +1519,7 @@ pub enum input_action {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum build_check_type {
     #[value = 0]
@@ -1521,7 +1537,7 @@ pub enum build_check_type {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum gui_type {
     #[value = 0]
@@ -1567,7 +1583,7 @@ pub enum gui_type {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum behavior_result {
     #[value = 0]
@@ -1581,7 +1597,7 @@ pub enum behavior_result {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum flow_precision_index {
     #[value = 0]
@@ -1603,7 +1619,7 @@ pub enum flow_precision_index {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum entity_status {
     #[value = 1]
@@ -1697,7 +1713,7 @@ pub enum entity_status {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum rocket_silo_status {
     #[value = 0]
@@ -1733,7 +1749,7 @@ pub enum rocket_silo_status {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum render_mode {
     #[value = 1]
@@ -1745,7 +1761,7 @@ pub enum render_mode {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum input_method {
     #[value = 0]
@@ -1755,7 +1771,7 @@ pub enum input_method {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum game_controller_interaction {
     #[value = 0]
@@ -1767,7 +1783,7 @@ pub enum game_controller_interaction {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum rich_text_setting {
     #[value = 17]
@@ -1779,7 +1795,7 @@ pub enum rich_text_setting {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum relative_gui_position {
     #[value = 0]
@@ -1793,141 +1809,141 @@ pub enum relative_gui_position {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = str)]
 pub enum relative_gui_type {
-    #[value = "script-inventory-gui"]
-    script_inventory_gui,
-    #[value = "tile-variations-gui"]
-    tile_variations_gui,
-    #[value = "resource-entity-gui"]
-    resource_entity_gui,
     #[value = "blueprint-library-gui"]
     blueprint_library_gui,
-    #[value = "power-switch-gui"]
-    power_switch_gui,
-    #[value = "generic-on-off-entity-gui"]
-    generic_on_off_entity_gui,
-    #[value = "infinity-pipe-gui"]
-    infinity_pipe_gui,
-    #[value = "loader-gui"]
-    loader_gui,
-    #[value = "blueprint-setup-gui"]
-    blueprint_setup_gui,
-    #[value = "accumulator-gui"]
-    accumulator_gui,
-    #[value = "deconstruction-item-gui"]
-    deconstruction_item_gui,
-    #[value = "rocket-silo-gui"]
-    rocket_silo_gui,
-    #[value = "equipment-grid-gui"]
-    equipment_grid_gui,
-    #[value = "entity-variations-gui"]
-    entity_variations_gui,
     #[value = "production-gui"]
     production_gui,
-    #[value = "item-with-inventory-gui"]
-    item_with_inventory_gui,
+    #[value = "train-stop-gui"]
+    train_stop_gui,
     #[value = "bonus-gui"]
     bonus_gui,
-    #[value = "splitter-gui"]
-    splitter_gui,
-    #[value = "admin-gui"]
-    admin_gui,
-    #[value = "inserter-gui"]
-    inserter_gui,
-    #[value = "burner-equipment-gui"]
-    burner_equipment_gui,
-    #[value = "pipe-gui"]
-    pipe_gui,
-    #[value = "lamp-gui"]
-    lamp_gui,
+    #[value = "tile-variations-gui"]
+    tile_variations_gui,
+    #[value = "trains-gui"]
+    trains_gui,
+    #[value = "achievement-gui"]
+    achievement_gui,
+    #[value = "furnace-gui"]
+    furnace_gui,
     #[value = "permissions-gui"]
     permissions_gui,
     #[value = "logistic-gui"]
     logistic_gui,
-    #[value = "train-gui"]
-    train_gui,
-    #[value = "storage-tank-gui"]
-    storage_tank_gui,
-    #[value = "electric-energy-interface-gui"]
-    electric_energy_interface_gui,
-    #[value = "rail-signal-gui"]
-    rail_signal_gui,
-    #[value = "wall-gui"]
-    wall_gui,
-    #[value = "achievement-gui"]
-    achievement_gui,
-    #[value = "entity-with-energy-source-gui"]
-    entity_with_energy_source_gui,
-    #[value = "additional-entity-info-gui"]
-    additional_entity_info_gui,
-    #[value = "spider-vehicle-gui"]
-    spider_vehicle_gui,
-    #[value = "upgrade-item-gui"]
-    upgrade_item_gui,
-    #[value = "rename-stop-gui"]
-    rename_stop_gui,
-    #[value = "market-gui"]
-    market_gui,
+    #[value = "heat-interface-gui"]
+    heat_interface_gui,
     #[value = "controller-gui"]
     controller_gui,
+    #[value = "script-inventory-gui"]
+    script_inventory_gui,
     #[value = "server-config-gui"]
     server_config_gui,
     #[value = "armor-gui"]
     armor_gui,
+    #[value = "admin-gui"]
+    admin_gui,
+    #[value = "burner-equipment-gui"]
+    burner_equipment_gui,
     #[value = "other-player-gui"]
     other_player_gui,
-    #[value = "decider-combinator-gui"]
-    decider_combinator_gui,
+    #[value = "rename-stop-gui"]
+    rename_stop_gui,
+    #[value = "entity-with-energy-source-gui"]
+    entity_with_energy_source_gui,
+    #[value = "loader-gui"]
+    loader_gui,
     #[value = "blueprint-book-gui"]
     blueprint_book_gui,
-    #[value = "container-gui"]
-    container_gui,
+    #[value = "item-with-inventory-gui"]
+    item_with_inventory_gui,
+    #[value = "decider-combinator-gui"]
+    decider_combinator_gui,
     #[value = "programmable-speaker-gui"]
     programmable_speaker_gui,
-    #[value = "transport-belt-gui"]
-    transport_belt_gui,
-    #[value = "rail-chain-signal-gui"]
-    rail_chain_signal_gui,
-    #[value = "roboport-gui"]
-    roboport_gui,
-    #[value = "car-gui"]
-    car_gui,
-    #[value = "reactor-gui"]
-    reactor_gui,
+    #[value = "equipment-grid-gui"]
+    equipment_grid_gui,
+    #[value = "spider-vehicle-gui"]
+    spider_vehicle_gui,
+    #[value = "deconstruction-item-gui"]
+    deconstruction_item_gui,
     #[value = "mining-drill-gui"]
     mining_drill_gui,
+    #[value = "upgrade-item-gui"]
+    upgrade_item_gui,
+    #[value = "transport-belt-gui"]
+    transport_belt_gui,
+    #[value = "blueprint-setup-gui"]
+    blueprint_setup_gui,
+    #[value = "inserter-gui"]
+    inserter_gui,
+    #[value = "assembling-machine-gui"]
+    assembling_machine_gui,
+    #[value = "splitter-gui"]
+    splitter_gui,
+    #[value = "lamp-gui"]
+    lamp_gui,
+    #[value = "infinity-pipe-gui"]
+    infinity_pipe_gui,
+    #[value = "pipe-gui"]
+    pipe_gui,
+    #[value = "standalone-character-gui"]
+    standalone_character_gui,
+    #[value = "lab-gui"]
+    lab_gui,
+    #[value = "generic-on-off-entity-gui"]
+    generic_on_off_entity_gui,
+    #[value = "wall-gui"]
+    wall_gui,
+    #[value = "storage-tank-gui"]
+    storage_tank_gui,
+    #[value = "power-switch-gui"]
+    power_switch_gui,
+    #[value = "rail-signal-gui"]
+    rail_signal_gui,
+    #[value = "rail-chain-signal-gui"]
+    rail_chain_signal_gui,
+    #[value = "beacon-gui"]
+    beacon_gui,
+    #[value = "accumulator-gui"]
+    accumulator_gui,
+    #[value = "reactor-gui"]
+    reactor_gui,
+    #[value = "car-gui"]
+    car_gui,
+    #[value = "container-gui"]
+    container_gui,
     #[value = "linked-container-gui"]
     linked_container_gui,
     #[value = "assembling-machine-select-recipe-gui"]
     assembling_machine_select_recipe_gui,
-    #[value = "assembling-machine-gui"]
-    assembling_machine_gui,
-    #[value = "furnace-gui"]
-    furnace_gui,
-    #[value = "lab-gui"]
-    lab_gui,
-    #[value = "train-stop-gui"]
-    train_stop_gui,
-    #[value = "heat-interface-gui"]
-    heat_interface_gui,
     #[value = "electric-network-gui"]
     electric_network_gui,
-    #[value = "beacon-gui"]
-    beacon_gui,
+    #[value = "train-gui"]
+    train_gui,
+    #[value = "rocket-silo-gui"]
+    rocket_silo_gui,
+    #[value = "roboport-gui"]
+    roboport_gui,
     #[value = "arithmetic-combinator-gui"]
     arithmetic_combinator_gui,
-    #[value = "trains-gui"]
-    trains_gui,
     #[value = "constant-combinator-gui"]
     constant_combinator_gui,
-    #[value = "standalone-character-gui"]
-    standalone_character_gui,
+    #[value = "electric-energy-interface-gui"]
+    electric_energy_interface_gui,
+    #[value = "market-gui"]
+    market_gui,
+    #[value = "additional-entity-info-gui"]
+    additional_entity_info_gui,
+    #[value = "resource-entity-gui"]
+    resource_entity_gui,
+    #[value = "entity-variations-gui"]
+    entity_variations_gui,
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum disconnect_reason {
     #[value = 0]
@@ -1956,7 +1972,9 @@ pub enum disconnect_reason {
 
 
 pub mod prototypes {
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    use super::*;
+
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum achievement {
         #[value = 0]
@@ -1995,63 +2013,63 @@ pub mod prototypes {
         train_path_achievement,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum ambient_sound {
         #[value = 0]
         ambient_sound,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum ammo_category {
         #[value = 0]
         ammo_category,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum animation {
         #[value = 0]
         animation,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum autoplace_control {
         #[value = 0]
         autoplace_control,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum custom_input {
         #[value = 0]
         custom_input,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum damage_type {
         #[value = 0]
         damage_type,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum decorative {
         #[value = 0]
         optimized_decorative,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum editor_controller {
         #[value = 0]
         editor_controller,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum entity {
         #[value = 0]
@@ -2264,7 +2282,7 @@ pub mod prototypes {
         wall,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum equipment {
         #[value = 0]
@@ -2287,56 +2305,56 @@ pub mod prototypes {
         solar_panel_equipment,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum equipment_category {
         #[value = 0]
         equipment_category,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum equipment_grid {
         #[value = 0]
         equipment_grid,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum fluid {
         #[value = 0]
         fluid,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum font {
         #[value = 0]
         font,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum fuel_category {
         #[value = 0]
         fuel_category,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum god_controller {
         #[value = 0]
         god_controller,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum gui_style {
         #[value = 0]
         gui_style,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum item {
         #[value = 0]
@@ -2383,203 +2401,203 @@ pub mod prototypes {
         upgrade_item,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum item_group {
         #[value = 0]
         item_group,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum item_subgroup {
         #[value = 0]
         item_subgroup,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum map_gen_presets {
         #[value = 0]
         map_gen_presets,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum map_settings {
         #[value = 0]
         map_settings,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum module_category {
         #[value = 0]
         module_category,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum mouse_cursor {
         #[value = 0]
         mouse_cursor,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum noise_expression {
         #[value = 0]
         noise_expression,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum noise_layer {
         #[value = 0]
         noise_layer,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum particle {
         #[value = 0]
         optimized_particle,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum recipe {
         #[value = 0]
         recipe,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum recipe_category {
         #[value = 0]
         recipe_category,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum resource_category {
         #[value = 0]
         resource_category,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum shortcut {
         #[value = 0]
         shortcut,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum sound {
         #[value = 0]
         sound,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum spectator_controller {
         #[value = 0]
         spectator_controller,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum sprite {
         #[value = 0]
         sprite,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum technology {
         #[value = 0]
         technology,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum tile {
         #[value = 0]
         tile,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum tile_effect {
         #[value = 0]
         tile_effect,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum tips_and_tricks_item {
         #[value = 0]
         tips_and_tricks_item,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum tips_and_tricks_item_category {
         #[value = 0]
         tips_and_tricks_item_category,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum trigger_target_type {
         #[value = 0]
         trigger_target_type,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum trivial_smoke {
         #[value = 0]
         trivial_smoke,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum tutorial {
         #[value = 0]
         tutorial,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum utility_constants {
         #[value = 0]
         utility_constants,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum utility_sounds {
         #[value = 0]
         utility_sounds,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum utility_sprites {
         #[value = 0]
         utility_sprites,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum virtual_signal {
         #[value = 0]
         virtual_signal,
     }
     
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
     #[factorio_define(kind = u8)]
     pub enum wind_sound {
         #[value = 0]
@@ -2588,7 +2606,7 @@ pub mod prototypes {
     
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum print_sound {
     #[value = 1]
@@ -2600,7 +2618,7 @@ pub enum print_sound {
 }
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]
 #[factorio_define(kind = u8)]
 pub enum print_skip {
     #[value = 0]
@@ -2610,3 +2628,6 @@ pub enum print_skip {
     #[value = 2]
     if_visible,
 }
+
+
+

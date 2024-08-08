@@ -1,5 +1,7 @@
-_ = 'This file automatically generates rust bindings for the defines table'
-_ = 'Run this inside factorio as a /c command'
+--[[
+This file automatically generates rust bindings for the defines table.
+Run this inside factorio as a /c command.
+--]]
 
 local function string_split(inputstr, sep)
     if sep == nil then
@@ -80,10 +82,12 @@ local function convert_to_rust(name, table)
         for k, v in pairs(table) do
             module = module .. '\n' .. convert_to_rust(k, v)
         end
-        return 'pub mod ' .. name .. ' {' .. do_indent(module) .. '\n}'
+        return 'pub mod ' .. name .. ' {\n' ..
+        '    use super::*;\n' ..
+        do_indent(module) .. '\n}'
     end
 
-    local enum = '#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]\n' ..
+    local enum = '#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, rivets_macros::FactorioDefine)]\n' ..
         '#[factorio_define(kind = ' .. figure_out_enum_return_type(table) .. ')]\n' ..
         'pub enum ' .. name .. ' {\n'
     for k, representation in pairs(table) do
@@ -98,12 +102,12 @@ local function convert_to_rust(name, table)
     return enum .. '}\n'
 end
 
-local header = '#![allow(clippy::enum_variant_names)]\n' ..
+local header = '#![allow(clippy::wildcard_imports)]' ..
+    '#![allow(clippy::enum_variant_names)]\n' ..
     '#![allow(clippy::too_many_lines)]\n' ..
     '#![allow(clippy::match_same_arms)]\n' ..
     '#![allow(non_camel_case_types)]\n\n' ..
-    'use rivets_macros::FactorioDefine;\n\n' ..
-    'pub trait Define<T, const COUNT: usize>: std::ops::Deref<Target = T> {\n' ..
+    'pub trait Define<const COUNT: usize>: std::ops::Deref {\n' ..
     '    fn variants() -> &\'static [Self; COUNT] where Self: Sized;\n' ..
     '}\n'
 
