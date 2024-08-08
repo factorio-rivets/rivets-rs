@@ -1,4 +1,5 @@
-#![allow(clippy::wildcard_imports)]#![allow(clippy::enum_variant_names)]
+#![allow(clippy::wildcard_imports)]
+#![allow(clippy::enum_variant_names)]
 #![allow(clippy::too_many_lines)]
 #![allow(clippy::match_same_arms)]
 #![allow(non_camel_case_types)]

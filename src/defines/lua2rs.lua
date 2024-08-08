@@ -102,7 +102,7 @@ local function convert_to_rust(name, table)
     return enum .. '}\n'
 end
 
-local header = '#![allow(clippy::wildcard_imports)]' ..
+local header = '#![allow(clippy::wildcard_imports)]\n' ..
     '#![allow(clippy::enum_variant_names)]\n' ..
     '#![allow(clippy::too_many_lines)]\n' ..
     '#![allow(clippy::match_same_arms)]\n' ..
