@@ -1147,7 +1147,7 @@ fn decompile_classes_unions_and_enums<'a>(
         bail!("Could not find any classes, unions, or enums with the name {target}");
     }
 
-    let mut base_classes =  HashSet::new();
+    let mut base_classes = HashSet::new();
     for dc in &classes_and_unions {
         for base_class in dc.base_classes.borrow().keys() {
             base_classes.insert(base_class.clone());

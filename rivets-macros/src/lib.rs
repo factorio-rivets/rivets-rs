@@ -78,16 +78,19 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     let result = quote! {
+        retour::static_detour! {
+            static Detour : #cpp_function_header;
+        }
+
         #[doc = #unmangled_name]
         #callback
 
         unsafe fn hook(address: u64) -> anyhow::Result<()> {
             retour::static_detour! {
-                static #name : #cpp_function_header;
+                static Detour : #cpp_function_header;
             }
-
             let compiled_function: #cpp_function_header = std::mem::transmute(address);
-            #name.initialize(compiled_function, #name)?.enable()?;
+            Detour.initialize(compiled_function, #name)?.enable()?;
             Ok(())
         }
 
