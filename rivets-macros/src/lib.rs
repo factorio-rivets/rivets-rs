@@ -1,4 +1,7 @@
+#![warn(missing_docs)]
 #![feature(proc_macro_diagnostic)]
+
+//! Contains the proc macros for rivets.
 
 use anyhow::{bail, Result};
 use darling::FromDeriveInput;
@@ -39,6 +42,48 @@ fn determine_calling_convention(input: &ItemFn, unmangled_name: &str) -> Result<
     }
 }
 
+/// A procedural macro for detouring a C++ compiled function.
+/// 
+/// The argument to the macro is the mangled name of the C++ function to detour.
+/// I recommend finding these mangled names by using `IDA Free with the Hex-Rays Decompiler` to inspect the factorio binary.
+/// 
+/// This macro is useful in the following scenarios:
+///     - Running rust code after a C++ function is called.
+///     - Running rust code before a C++ function is called.
+///     - Overwriting a C++ function with a rust function.
+///     - Preforming some operation on the arguments of a C++ function before calling the original function.
+///     - Preforming some operation on the return value of a C++ function before returning it to the caller.
+/// 
+/// This macro cannot hook into the middle of a C++ function. It can only hook into the beginning or end of a function.
+/// 
+/// Exposes an `unsafe` `back` function that can be called in order to resume control flow to the original C++ function.
+/// 
+/// Internally uses the `retour` crate to create a static detour for the function and thus inherits the safety guarantees of that crate.
+/// 
+/// # Examples
+/// ```
+/// #[detour(?run@LuaEventDispatcher@@AEAAXW4LuaEventType@@VMapTickType@@P8LuaGameScript@@EAA_NAEBVGameAction@@@Z2@Z)]
+/// fn run(
+///    this: Opaque,
+///    lua_event_type: i32,
+///    map_tick_type: Opaque,
+///    lua_game_script: Opaque,
+///    game_action: Opaque,
+/// ) {
+///     let event: Result<defines::events, _> = (lua_event_type as u8).try_into();
+///     if let Ok(event) = event {
+///         info!("A simple Rust event handler! {:?}", q);
+///     }
+///     unsafe { back(this, lua_event_type, map_tick_type, lua_game_script, game_action) }
+/// }
+/// ```
+/// 
+/// # Safety
+/// The arguments to the detoured function are the raw FFI pointers to the arguments of the original C++ function.
+/// It is up to the user to ensure that the arguments are valid FFI types.
+/// All structs, classes, enums, and union arguments must have a corresponding `#[repr(C)]` attribute and must also have the correct offsets and sizes.
+/// Alternatively, the user can use the `rivets::Opaque` type to represent any arbitrary FFI data if you do not intend to interact with the data.
+/// See the `pdb2hpp` module for a tool that can generate the correct FFI types for C++ functions.
 #[proc_macro_attribute]
 pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mangled_name = attr.to_string();
@@ -122,6 +167,7 @@ struct DefineOpts {
     kind: Ident,
 }
 
+/// A procedural macro for constructing the factorio defines table.
 #[proc_macro_derive(FactorioDefine, attributes(factorio_define, value))]
 pub fn define_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input);
@@ -178,8 +224,9 @@ pub fn define_derive(input: TokenStream) -> TokenStream {
         }));
     }
 
-    let impl_from = {
-        let kind = if format!("{kind}").eq("str") {
+    let str_kind = format!("{kind}");
+    let mut impl_from = {
+        let kind = if str_kind == "str" {
             quote! {
                 &#kind
             }
@@ -202,6 +249,40 @@ pub fn define_derive(input: TokenStream) -> TokenStream {
             }
         }
     };
+
+    if str_kind == "i8" || str_kind == "i16" || str_kind == "i32" || str_kind == "i64" || str_kind == "i128" {
+        // Add a impl From<isize>
+        impl_from = quote! {
+            #impl_from
+
+            impl std::convert::TryFrom<&isize> for #ident {
+                type Error = &'static str;
+
+                fn try_from(value: &isize) -> Result<Self, Self::Error> {
+                    match value {
+                        #from_matches
+                        _ => panic!("Invalid value"),
+                    }
+                }
+            }
+        };
+    } else if str_kind == "u8" || str_kind == "u16" || str_kind == "u32" || str_kind == "u64" || str_kind == "u128" {
+        // Add a impl From<usize>
+        impl_from = quote! {
+            #impl_from
+
+            impl std::convert::TryFrom<&usize> for #ident {
+                type Error = &'static str;
+
+                fn try_from(value: &usize) -> Result<Self, Self::Error> {
+                    match value {
+                        #from_matches
+                        _ => panic!("Invalid value"),
+                    }
+                }
+            }
+        };
+    }
 
     let output = quote! {
         impl std::ops::Deref for #ident {
