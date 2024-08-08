@@ -15,7 +15,7 @@ end
 local function figure_out_enum_return_type(table)
     local _, first = next(table)
     if type(first) == 'string' then
-        return '&\'static str'
+        return 'str'
     elseif type(first) == 'number' then
         local has_negatives = false
         for _, v in pairs(table) do
@@ -55,21 +55,9 @@ local function figure_out_enum_return_type(table)
             end
         end
         return (has_negatives and 'i' or 'u') .. highest_number_of_bits
-    elseif type(first) == 'table' then
-        return 'Box<dyn Defines<T>>'
     else
         error('Unknown type: ' .. type(first))
     end
-end
-
-local function get_impl(T, name, deref_function, key_function, iter_function)
-    local impl = 'impl std::ops::Deref for ' .. name .. ' {\n    type Target = ' .. (T == '&\'static str' and 'str' or T) .. ';\n'
-    impl = impl .. deref_function .. '        }\n' .. '    }\n'
-    impl = impl .. '}\n'
-    impl = impl .. 'impl crate::defines::Defines<' .. T .. '> for ' .. name .. ' {\n'
-    impl = impl .. key_function .. '        }\n    }\n'
-    impl = impl .. iter_function .. '        ]\n    }\n'
-    return impl .. '}'
 end
 
 local function do_indent(structure)
@@ -85,6 +73,8 @@ end
 local function convert_to_rust(name, table)
     local _, first = next(table)
     local is_module = type(first) == 'table'
+    name = convert_to_valid_rust_identifier(name)
+
     if is_module then
         local module = ''
         for k, v in pairs(table) do
@@ -93,48 +83,31 @@ local function convert_to_rust(name, table)
         return 'pub mod ' .. name .. ' {' .. do_indent(module) .. '\n}'
     end
 
-    name = convert_to_valid_rust_identifier(name)
-    local derives = '#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]\n'
-    local enum = derives .. 'pub enum ' .. name .. ' {\n'
-    local T = figure_out_enum_return_type(table)
-    local lifetime = T == '&\'static str' and ' ' or '&\'static '
-    local deref_function = '    fn deref(&self) -> ' .. lifetime .. T .. ' {\n' .. '        match self {\n'
-    local key_function = '    fn key(&self) -> &\'static str {\n' .. '        match self {\n'
-    local iter_function = '    fn iter() -> &\'static [Self] {\n' .. '        &[\n'
-    for k, repersentation in pairs(table) do
-        enum_key = convert_to_valid_rust_identifier(k)
-        if type(repersentation) == 'table' then
-            repersentation = name .. '::' .. enum_key
-        elseif type(repersentation) == 'string' then
-            repersentation = '"' .. repersentation .. '"'
+    local enum = '#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FactorioDefine)]\n' ..
+        '#[factorio_define(kind = ' .. figure_out_enum_return_type(table) .. ')]\n' ..
+        'pub enum ' .. name .. ' {\n'
+    for k, representation in pairs(table) do
+        if type(representation) == 'string' then
+            representation = '"' .. representation .. '"'
         end
-        enum = enum .. '    ' .. enum_key .. ',\n'
 
-        local borrow = (T == '&\'static str' and '' or '&')
-        deref_function = deref_function .. '            Self::' .. enum_key .. ' => ' .. borrow .. repersentation .. ',\n'
-        key_function = key_function .. '            Self::' .. enum_key .. ' => "' .. k .. '",\n'
-        iter_function = iter_function .. '            Self::' .. enum_key .. ',\n'
+        enum = enum .. '    #[value = ' .. representation .. ']\n' ..
+            '    ' .. convert_to_valid_rust_identifier(k) .. ',\n'
     end
 
-    return enum .. '}\n' .. get_impl(T, name, deref_function, key_function, iter_function)
+    return enum .. '}\n'
 end
 
-local function get_defines_trait()
-    local trait = 'pub trait Defines<T>: std::ops::Deref {\n'
-    trait = trait .. '    fn key(&self) -> &\'static str;\n'
-    trait = trait .. '    fn iter() -> &\'static [Self] where Self: std::marker::Sized;\n'
-    trait = trait .. '}\n'
-    return trait
-end
+local header = '#![allow(clippy::enum_variant_names)]\n' ..
+    '#![allow(clippy::too_many_lines)]\n' ..
+    '#![allow(clippy::match_same_arms)]\n' ..
+    '#![allow(non_camel_case_types)]\n\n' ..
+    'use rivets_macros::FactorioDefine;\n\n' ..
+    'pub trait Define<T, const COUNT: usize>: std::ops::Deref<Target = T> {\n' ..
+    '    fn variants() -> &\'static [Self; COUNT] where Self: Sized;\n' ..
+    '}\n'
 
-local attributes = {
-    '#![allow(clippy::enum_variant_names)]',
-    '#![allow(clippy::too_many_lines)]',
-    '#![allow(clippy::match_same_arms)]',
-    '#![allow(non_camel_case_types)]',
-}
-
-local rust = table.concat(attributes, '\n') .. '\n\n' .. get_defines_trait() .. '\n'
+local rust = header .. '\n'
 for k, v in pairs(defines) do
     rust = rust .. convert_to_rust(k, v) .. '\n\n'
 end

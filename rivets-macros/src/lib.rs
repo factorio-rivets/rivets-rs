@@ -1,10 +1,20 @@
 #![feature(proc_macro_diagnostic)]
 
 use anyhow::{bail, Result};
+use darling::FromDeriveInput;
 use lazy_regex::regex;
-use proc_macro::{Diagnostic, Level, Span, TokenStream};
+use proc_macro::{self, Diagnostic, Level, Span, TokenStream};
+use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
-use syn::{parse_macro_input, Abi, FnArg, ItemFn};
+use syn::{parse_macro_input, Abi, DeriveInput, Error, Expr, FnArg, Ident, ItemFn, Variant};
+
+macro_rules! derive_error {
+    ($string: tt) => {
+        Error::new(Span::call_site(), $string)
+            .to_compile_error()
+            .into()
+    };
+}
 
 fn failure(callback: proc_macro2::TokenStream, error_message: &str) -> TokenStream {
     Diagnostic::spanned(Span::call_site(), Level::Error, error_message).emit();
@@ -93,4 +103,84 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
     Diagnostic::spanned(Span::call_site(), Level::Note, unmangled_name.clone()).emit();
 
     result.into()
+}
+
+#[derive(FromDeriveInput)]
+#[darling(attributes(factorio_define))]
+struct DefineOpts {
+    kind: Ident,
+}
+
+#[proc_macro_derive(FactorioDefine, attributes(factorio_define, value))]
+pub fn define_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input);
+    let Ok(DefineOpts { kind }) = DefineOpts::from_derive_input(&input) else {
+        return derive_error!("Missing #[kind(?)] attribute!");
+    };
+    let DeriveInput { ident, data, .. } = input;
+
+    let syn::Data::Enum(data) = data else {
+        return derive_error!("FactorioDefine can only be used on enums!");
+    };
+
+    let count = data.variants.len();
+    let mut deref_matches = TokenStream2::new();
+    let mut variants = TokenStream2::new();
+
+    for variant in data.variants {
+        let mut value = None;
+        for attr in &variant.attrs {
+            let syn::Meta::NameValue(nv) = &attr.meta else {
+                continue;
+            };
+
+            if !nv.path.is_ident("value".into()) {
+                continue;
+            }
+
+            let Expr::Lit(syn::PatLit { lit, .. }) = &nv.value else {
+                return derive_error!("All variants must have a #[value(?)] attribute!");
+            };
+
+            value = Some(lit.clone());
+
+            break;
+        }
+
+        let Some(value) = value else {
+            return derive_error!("All variants must have a #[value = ?] attribute!");
+        };
+
+        let Variant { ident, .. } = variant;
+
+        deref_matches.extend(std::iter::once(quote! {
+            Self::#ident => &#value,
+        }));
+
+        variants.extend(std::iter::once(quote! {
+            Self::#ident,
+        }));
+    }
+
+    let output = quote! {
+        impl std::ops::Deref for #ident {
+            type Target = #kind;
+
+            fn deref(&self) -> &'static Self::Target {
+                match self {
+                    #deref_matches
+                }
+            }
+        }
+
+        impl Define<#kind, #count> for #ident {
+            fn variants() -> &'static [Self; #count] {
+                &[
+                    #variants
+                ]
+            }
+        }
+    };
+
+    output.into()
 }
