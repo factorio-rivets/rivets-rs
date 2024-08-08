@@ -260,7 +260,7 @@ pub fn define_derive(input: TokenStream) -> TokenStream {
                 fn try_from(value: &isize) -> Result<Self, Self::Error> {
                     match value {
                         #from_matches
-                        _ => panic!("Invalid value"),
+                        _ => Err("Invalid value"),
                     }
                 }
             }
@@ -275,7 +275,7 @@ pub fn define_derive(input: TokenStream) -> TokenStream {
                 fn try_from(value: &usize) -> Result<Self, Self::Error> {
                     match value {
                         #from_matches
-                        _ => panic!("Invalid value"),
+                        _ => Err("Invalid value"),
                     }
                 }
             }
