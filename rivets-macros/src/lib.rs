@@ -80,8 +80,8 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
         unsafe #calling_convention fn(#arguments) #return_type
     };
 
-    let source = quote! {
-        unsafe fn source(#inputs) #return_type {
+    let back = quote! {
+        unsafe fn back(#inputs) #return_type {
             Detour.call(#arg_names)
         }
     };
@@ -91,7 +91,7 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
             static Detour : #cpp_function_header;
         }
 
-        #source
+        #back
 
         #[doc = #unmangled_name]
         #callback
