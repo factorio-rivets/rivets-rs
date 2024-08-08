@@ -251,7 +251,6 @@ pub fn define_derive(input: TokenStream) -> TokenStream {
     };
 
     if str_kind == "i8" || str_kind == "i16" || str_kind == "i32" || str_kind == "i64" || str_kind == "i128" {
-        // Add a impl From<isize>
         impl_from = quote! {
             #impl_from
 
@@ -267,7 +266,6 @@ pub fn define_derive(input: TokenStream) -> TokenStream {
             }
         };
     } else if str_kind == "u8" || str_kind == "u16" || str_kind == "u32" || str_kind == "u64" || str_kind == "u128" {
-        // Add a impl From<usize>
         impl_from = quote! {
             #impl_from
 
