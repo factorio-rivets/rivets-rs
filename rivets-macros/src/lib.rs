@@ -42,24 +42,26 @@ fn determine_calling_convention(input: &ItemFn, unmangled_name: &str) -> Result<
     }
 }
 
+static mut MANGLED_NAMES: Vec<(String, String)> = vec![];
+
 /// A procedural macro for detouring a C++ compiled function.
-/// 
+///
 /// The argument to the macro is the mangled name of the C++ function to detour.
 /// I recommend finding these mangled names by using `IDA Free with the Hex-Rays Decompiler` to inspect the factorio binary.
-/// 
+///
 /// This macro is useful in the following scenarios:
 ///     - Running rust code after a C++ function is called.
 ///     - Running rust code before a C++ function is called.
 ///     - Overwriting a C++ function with a rust function.
 ///     - Preforming some operation on the arguments of a C++ function before calling the original function.
 ///     - Preforming some operation on the return value of a C++ function before returning it to the caller.
-/// 
+///
 /// This macro cannot hook into the middle of a C++ function. It can only hook into the beginning or end of a function.
-/// 
+///
 /// Exposes an `unsafe` `back` function that can be called in order to resume control flow to the original C++ function.
-/// 
+///
 /// Internally uses the `retour` crate to create a static detour for the function and thus inherits the safety guarantees of that crate.
-/// 
+///
 /// # Examples
 /// ```
 /// #[detour(?run@LuaEventDispatcher@@AEAAXW4LuaEventType@@VMapTickType@@P8LuaGameScript@@EAA_NAEBVGameAction@@@Z2@Z)]
@@ -77,7 +79,7 @@ fn determine_calling_convention(input: &ItemFn, unmangled_name: &str) -> Result<
 ///     unsafe { back(this, lua_event_type, map_tick_type, lua_game_script, game_action) }
 /// }
 /// ```
-/// 
+///
 /// # Safety
 /// The arguments to the detoured function are the raw FFI pointers to the arguments of the original C++ function.
 /// It is up to the user to ensure that the arguments are valid FFI types.
@@ -125,40 +127,58 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
         unsafe #calling_convention fn(#arguments) #return_type
     };
 
-    let back = quote! {
-        unsafe fn back(#inputs) #return_type {
-            Detour.call(#arg_names)
-        }
-    };
-
     let result = quote! {
-        retour::static_detour! {
-            static Detour : #cpp_function_header;
-        }
+        mod #name {
+            use super::*;
 
-        #back
+            retour::static_detour! {
+                static Detour : #cpp_function_header;
+            }
 
-        #[doc = #unmangled_name]
-        #callback
+            unsafe fn back(#inputs) #return_type {
+                Detour.call(#arg_names)
+            }
 
-        unsafe fn hook(address: u64) -> anyhow::Result<()> {
-            let compiled_function: #cpp_function_header = std::mem::transmute(address);
-            Detour.initialize(compiled_function, #name)?.enable()?;
-            Ok(())
-        }
+            #[doc = #unmangled_name]
+            #callback
 
-        #[ctor::ctor]
-        fn ctor() {
-            rivets::start_stream();
-            if let Err(e) = rivets::inject(#mangled_name, hook) {
-                tracing::error!("{e}");
+            pub unsafe fn hook(address: u64) -> anyhow::Result<()> {
+                let compiled_function: #cpp_function_header = std::mem::transmute(address);
+                Detour.initialize(compiled_function, #name)?.enable()?;
+                Ok(())
             }
         }
     };
 
+    unsafe {
+        MANGLED_NAMES.push((mangled_name.clone(), format!("{name}")));
+    }
+
     Diagnostic::spanned(Span::call_site(), Level::Note, unmangled_name.clone()).emit();
 
     result.into()
+}
+
+#[proc_macro]
+pub fn initialize(_item: TokenStream) -> TokenStream {
+    let injects = unsafe { MANGLED_NAMES.clone() };
+    let injects = injects.iter().map(|(mangled_name, name)| {
+        let name = Ident::new(name, proc_macro2::Span::call_site());
+        quote! {
+            if let Err(e) = rivets::inject(#mangled_name, #name::hook) {
+                //tracing::error!("{e}");
+            }
+        }
+    });
+
+    quote! {
+        #[ctor::ctor]
+        fn ctor() {
+            rivets::start_stream();
+            #(#injects)*
+        }
+    }
+    .into()
 }
 
 #[derive(FromDeriveInput)]
@@ -250,7 +270,12 @@ pub fn define_derive(input: TokenStream) -> TokenStream {
         }
     };
 
-    if str_kind == "i8" || str_kind == "i16" || str_kind == "i32" || str_kind == "i64" || str_kind == "i128" {
+    if str_kind == "i8"
+        || str_kind == "i16"
+        || str_kind == "i32"
+        || str_kind == "i64"
+        || str_kind == "i128"
+    {
         impl_from = quote! {
             #impl_from
 
@@ -265,7 +290,12 @@ pub fn define_derive(input: TokenStream) -> TokenStream {
                 }
             }
         };
-    } else if str_kind == "u8" || str_kind == "u16" || str_kind == "u32" || str_kind == "u64" || str_kind == "u128" {
+    } else if str_kind == "u8"
+        || str_kind == "u16"
+        || str_kind == "u32"
+        || str_kind == "u64"
+        || str_kind == "u128"
+    {
         impl_from = quote! {
             #impl_from
 
