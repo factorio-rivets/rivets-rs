@@ -140,6 +140,7 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
 
             #[doc = #unmangled_name]
+            #[allow(unused_variables)]
             #callback
 
             pub unsafe fn hook(address: u64) -> anyhow::Result<()> {
@@ -159,6 +160,9 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
     result.into()
 }
 
+/// A procedural macro for initializing the rivets library.
+/// This macro should be called once at the end of the `main.rs` file.
+/// It will initialize the rivets library and inject all of the detours.
 #[proc_macro]
 pub fn initialize(_item: TokenStream) -> TokenStream {
     let injects = unsafe { MANGLED_NAMES.clone() };
@@ -166,7 +170,7 @@ pub fn initialize(_item: TokenStream) -> TokenStream {
         let name = Ident::new(name, proc_macro2::Span::call_site());
         quote! {
             if let Err(e) = rivets::inject(#mangled_name, #name::hook) {
-                //tracing::error!("{e}");
+                eprintln!("{e}");
             }
         }
     });
@@ -174,7 +178,7 @@ pub fn initialize(_item: TokenStream) -> TokenStream {
     quote! {
         #[ctor::ctor]
         fn ctor() {
-            rivets::start_stream();
+            println!("Rivets initialized!");
             #(#injects)*
         }
     }

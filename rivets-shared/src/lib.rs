@@ -3,12 +3,9 @@ use cpp_demangle::Symbol;
 use dirs::home_dir;
 use pdb::{FallibleIterator, PDB};
 use std::ffi::CString;
-use std::net::TcpStream;
 use std::path::Path;
-use std::sync::Mutex;
 use std::{collections::HashMap, fs::File};
 use std::{ffi::CStr, path::PathBuf};
-use tracing::info;
 use undname::Flags;
 use windows::core::PCSTR;
 use windows::Win32::System::LibraryLoader::GetModuleHandleA;
@@ -79,19 +76,9 @@ pub fn inject(function_name: &str, hook: unsafe fn(u64) -> Result<()>) -> Result
     let Some(address) = pdb_cache.get_function_address(function_name) else {
         bail!("Failed to find {function_name} address");
     };
-    info!("{} address: {:#x}", function_name, address);
+    println!("{} address: {:#x}", function_name, address);
 
     unsafe { hook(address) }
-}
-
-pub fn start_stream() {
-    let ip = "127.0.0.1:40267";
-    let stream = TcpStream::connect(ip).unwrap_or_else(|_| {
-        panic!("Could not establish stdout connection to rivets. Port {ip} is busy.")
-    });
-    tracing_subscriber::fmt::fmt()
-        .with_writer(Mutex::new(stream))
-        .init();
 }
 
 pub trait AsPcstr {
