@@ -4,9 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.86"
-lazy-regex = "3.2.0"
-pdb = "0.8.0"
 rivets-macros = { path = "../rivets/rivets-macros" }
 rivets-shared = { path = "../rivets/rivets-shared" }
 
