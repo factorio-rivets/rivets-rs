@@ -4,7 +4,9 @@ use anyhow::{anyhow, bail, Context, Result};
 use clap::Parser;
 use dll_syringe::process::{BorrowedProcess, ProcessModule};
 use dll_syringe::{process::OwnedProcess, Syringe};
+use semver::Version;
 use std::ffi::CString;
+use std::fs;
 use std::fs::File;
 use std::io::{self};
 use std::os::windows::io::FromRawHandle;
@@ -16,8 +18,8 @@ use windows::Win32::Foundation::{
 use windows::Win32::Security::SECURITY_ATTRIBUTES;
 use windows::Win32::System::Pipes::CreatePipe;
 use windows::Win32::System::Threading::{
-    CreateProcessA, ResumeThread, TerminateProcess, WaitForSingleObject, CREATE_SUSPENDED,
-    INFINITE, PROCESS_INFORMATION, STARTUPINFOA,
+    CreateProcessA, ResumeThread, TerminateProcess, CREATE_SUSPENDED, PROCESS_INFORMATION,
+    STARTUPINFOA,
 };
 use zip::read::ZipArchive;
 
@@ -33,7 +35,7 @@ fn unzip_specific_file(zip_path: &Path, file_name: &str, output_path: &Path) -> 
         "Failed to create output file {}",
         output_path
             .to_str()
-            .ok_or(anyhow!("Failed to convert output path to string"))?
+            .ok_or(anyhow!("Failed to unzip rivets.dll"))?
     );
     let mut output_file = File::create(output_path).context(err)?;
 
@@ -43,14 +45,55 @@ fn unzip_specific_file(zip_path: &Path, file_name: &str, output_path: &Path) -> 
     Ok(())
 }
 
+fn find_latest_rivets_version(mods_folder: &Path) -> Result<String> {
+    let mut latest_version: Option<Version> = None;
+    let mut latest_version_file: Option<PathBuf> = None;
+
+    for entry in fs::read_dir(mods_folder)? {
+        let entry = entry?;
+        let file_name = entry.file_name();
+        if let Some(file_name_str) = file_name.to_str() {
+            if file_name_str.starts_with("rivets_") && file_name_str.ends_with(".zip") {
+                let version_str = file_name_str
+                    .trim_start_matches("rivets_")
+                    .trim_end_matches(".zip");
+                if let Ok(version) = Version::parse(version_str) {
+                    if let Some(current_version) = &latest_version {
+                        if version > *current_version {
+                            latest_version = Some(version);
+                            latest_version_file = Some(entry.path());
+                        }
+                    } else {
+                        latest_version = Some(version);
+                        latest_version_file = Some(entry.path());
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(file_path) = latest_version_file {
+        if let Some(file_name) = file_path.file_name() {
+            if let Some(file_name_str) = file_name.to_str() {
+                return Ok(file_name_str.to_string());
+            }
+        }
+    }
+
+    Err(anyhow!("No rivets mod found in the mods folder"))
+}
+
 fn extract_dll(mods_folder: &Path) -> Result<PathBuf> {
     const DLL_NAME: &str = "rivets/rivets.dll";
 
-    let zip_path = mods_folder.join("rivets_0.0.1.zip");
-    let dll_path = mods_folder.join(DLL_NAME);
+    let latest_rivets_version = find_latest_rivets_version(mods_folder)?;
+    println!("Found rivets version: {latest_rivets_version} Injecting...",);
 
     let mut output_path = std::env::current_dir()?;
-    output_path.push("rivets.dll");
+    output_path.push(format!("{latest_rivets_version}.dll"));
+
+    let zip_path = mods_folder.join(latest_rivets_version);
+    let dll_path = mods_folder.join(DLL_NAME);
 
     unzip_specific_file(&zip_path, DLL_NAME, &output_path)?;
 
@@ -151,16 +194,11 @@ fn main() -> Result<()> {
     unsafe {
         ResumeThread(factorio_process_information.hThread);
         CloseHandle(factorio_process_information.hThread).ok();
+        CloseHandle(factorio_process_information.hProcess).ok();
     }
 
     // Duplicate the factorio stdout stream onto our own stdout using OS pipes.
     io::copy(&mut reader, &mut io::stdout())?;
-
-    unsafe {
-        WaitForSingleObject(factorio_process_information.hProcess, INFINITE);
-    }
-
-    println!("Factorio process exited.");
 
     Ok(())
 }
