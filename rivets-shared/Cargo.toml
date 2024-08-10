@@ -4,18 +4,18 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-cpp_demangle = "0.4.3"
-undname = "1.1.2"
-pdb = "0.8.0"
-anyhow = "1.0.86"
-windows = { version = "0.58.0", features = [
+cpp_demangle = "0.4"
+undname = "1.1"
+pdb = "0.8"
+anyhow = "1.0"
+windows = { version = "0.58", features = [
     "Win32",
     "Win32_System",
     "Win32_System_LibraryLoader",
 ] }
-dirs = "5.0.1"
-syn = "2.0.72"
-proc-macro2 = "1.0.86"
+dirs = "5.0"
+syn = "2.0"
+proc-macro2 = "1.0"
 
 [lib]
 name = "rivets_shared"
