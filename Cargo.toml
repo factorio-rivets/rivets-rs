@@ -5,7 +5,6 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.86"
-indicatif = "0.17.8"
 lazy-regex = "3.2.0"
 pdb = "0.8.0"
 rivets-macros = { path = "../rivets/rivets-macros" }
@@ -22,7 +21,3 @@ trivial_regex = "allow"
 name = "rivets"
 crate-type = ["lib"]
 path = "src/lib.rs"
-
-[[bin]]
-name = "rivets"
-path = "src/main.rs"

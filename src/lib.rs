@@ -8,5 +8,4 @@ pub use rivets_macros::detour;
 pub use rivets_macros::initialize;
 
 extern crate rivets_shared;
-pub use rivets_shared::inject;
-pub use rivets_shared::Opaque;
+pub use rivets_shared::*;
