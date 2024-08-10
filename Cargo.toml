@@ -2,6 +2,10 @@
 name = "rivets"
 version = "0.1.0"
 edition = "2021"
+authors = ["Zachary Picco <zacharypicco@gmail.com>"]
+description = "Rivets is a Factorio mod loader written in Rust. Hook into compiled functions and change their behavior."
+license-file = "LICENSE.md"
+repository = "https://github.com/factorio-rivets/rivets"
 
 [dependencies]
 rivets-macros = { path = "../rivets/rivets-macros" }

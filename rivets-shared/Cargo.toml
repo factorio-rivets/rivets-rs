@@ -2,6 +2,9 @@
 name = "rivets-shared"
 version = "0.1.0"
 edition = "2021"
+authors = ["Zachary Picco <zacharypicco@gmail.com>"]
+description = "Rivets is a Factorio mod loader written in Rust. Hook into compiled functions and change their behavior."
+repository = "https://github.com/factorio-rivets/rivets"
 
 [dependencies]
 cpp_demangle = "0.4"
@@ -13,7 +16,6 @@ windows = { version = "0.58", features = [
     "Win32_System",
     "Win32_System_LibraryLoader",
 ] }
-dirs = "5.0"
 syn = "2.0"
 proc-macro2 = "1.0"
 
