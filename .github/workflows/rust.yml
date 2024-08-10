@@ -10,7 +10,7 @@ on:
   push:
     branches:
       - main
-      
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -20,7 +20,7 @@ jobs:
     runs-on: unbuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Stable rust toolchain
         run: rustup toolchain install stable --profile minimal
       - name: Check formatting
@@ -32,7 +32,7 @@ jobs:
     if: ${{ github.event_name == 'push' || !github.event.pull_request.draft }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Stable rust toolchain
         run: rustup toolchain install stable --profile minimal
       - name: Add Clippy
@@ -43,13 +43,13 @@ jobs:
           prefix-key: "rust-stable"
           shared-key: "clippy"
       - name: Install cargo-binstall
-        run: wget https://github.com/cargo-bins/cargo-binstall/releases/latest/download/cargo-binstall-x86_64-unknown-linux-gnu.tgz -O - | tar -xz -C $HOME/.cargo/bin  
+        uses: cargo-bins/cargo-binstall@main 
       - name: Install sarif-fmt & clippy-sarif
         run: cargo binstall --no-confirm --force sarif-fmt clippy-sarif
       - name: Run Clippy
         run: cargo clippy --message-format=json | clippy-sarif | tee results.sarif | sarif-fmt
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: results.sarif
 
@@ -70,9 +70,11 @@ jobs:
             - nightly
     steps:
         - name: Checkout
-          uses: actions/checkout@v3
+          uses: actions/checkout@v4
         - name: Setup ${{ matrix.toolchain }} toolchain
           run: rustup toolchain install ${{ matrix.toolchain }} --target ${{ matrix.platform.target }} --profile minimal
+        - name: Select ${{ matrix.toolchain }} toolchain
+          run: rustup default ${{ matrix.toolchain }}
         - name: Rust cache
           uses: Swatinem/rust-cache@v2
           with:

@@ -8,8 +8,8 @@ license-file = "LICENSE.md"
 repository = "https://github.com/factorio-rivets/rivets"
 
 [dependencies]
-rivets-macros = { path = "../rivets/rivets-macros" }
-rivets-shared = { path = "../rivets/rivets-shared" }
+rivets-macros = { path = "rivets-macros" }
+rivets-shared = { path = "rivets-shared" }
 
 [lints.clippy]
 nursery = { level = "warn", priority = -1 }
