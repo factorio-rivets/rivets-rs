@@ -17,7 +17,7 @@ env:
 jobs:
   fmt:
     name: Check formatting
-    runs-on: unbuntu-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,7 +28,7 @@ jobs:
 
   clippy:
     name: Clippy
-    runs-on: unbuntu-latest
+    runs-on: ubuntu-latest
     if: ${{ github.event_name == 'push' || !github.event.pull_request.draft }}
     steps:
       - name: Checkout
