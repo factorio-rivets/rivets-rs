@@ -8,8 +8,8 @@ license-file = "LICENSE.md"
 repository = "https://github.com/factorio-rivets/rivets"
 
 [dependencies]
-rivets-macros = { path = "../rivets-crate/rivets-macros" }
-rivets-shared = { path = "../rivets-crate/rivets-shared" }
+rivets-macros = { path = "rivets-macros" }
+rivets-shared = { path = "rivets-shared" }
 retour = { version = "0.3", features = ["static-detour"] }
 
 [lints.clippy]

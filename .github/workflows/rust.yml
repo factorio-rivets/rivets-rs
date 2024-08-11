@@ -10,17 +10,17 @@ on:
   push:
     branches:
       - main
-      
+
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   fmt:
     name: Check formatting
-    runs-on: unbuntu-latest
+    runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Stable rust toolchain
         run: rustup toolchain install stable --profile minimal
       - name: Check formatting
@@ -28,28 +28,32 @@ jobs:
 
   clippy:
     name: Clippy
-    runs-on: unbuntu-latest
+    runs-on: windows-latest
     if: ${{ github.event_name == 'push' || !github.event.pull_request.draft }}
+    permissions:
+      security-events: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-      - name: Stable rust toolchain
-        run: rustup toolchain install stable --profile minimal
+        uses: actions/checkout@v4
+      - name: Nightly rust toolchain
+        run: rustup toolchain install nightly --profile minimal
+      - name: Select nightly toolchain
+        run: rustup default nightly
       - name: Add Clippy
         run: rustup component add clippy
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: "rust-stable"
+          prefix-key: "rust-nightly"
           shared-key: "clippy"
       - name: Install cargo-binstall
-        run: wget https://github.com/cargo-bins/cargo-binstall/releases/latest/download/cargo-binstall-x86_64-unknown-linux-gnu.tgz -O - | tar -xz -C $HOME/.cargo/bin  
+        uses: cargo-bins/cargo-binstall@main 
       - name: Install sarif-fmt & clippy-sarif
         run: cargo binstall --no-confirm --force sarif-fmt clippy-sarif
       - name: Run Clippy
         run: cargo clippy --message-format=json | clippy-sarif | tee results.sarif | sarif-fmt
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: results.sarif
 
@@ -63,16 +67,18 @@ jobs:
             - os_name: Windows-x86_64
               os: windows-latest
               target: x86_64-pc-windows-gnu
-            - os_name: Linux-x86_64
-              os: ubuntu-latest
-              target: x86_64-unknown-linux-gnu
+            # - os_name: Linux-x86_64
+            #   os: ubuntu-latest
+            #   target: x86_64-unknown-linux-gnu
           toolchain:
             - nightly
     steps:
         - name: Checkout
-          uses: actions/checkout@v3
+          uses: actions/checkout@v4
         - name: Setup ${{ matrix.toolchain }} toolchain
           run: rustup toolchain install ${{ matrix.toolchain }} --target ${{ matrix.platform.target }} --profile minimal
+        - name: Select ${{ matrix.toolchain }} toolchain
+          run: rustup default ${{ matrix.toolchain }}
         - name: Rust cache
           uses: Swatinem/rust-cache@v2
           with:
