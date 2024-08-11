@@ -131,7 +131,7 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
         mod #name {
             use super::*;
 
-            retour::static_detour! {
+            rivets::retour::static_detour! {
                 static Detour : #cpp_function_header;
             }
 
@@ -143,7 +143,7 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
             #[allow(unused_variables)]
             #callback
 
-            pub unsafe fn hook(address: u64) -> anyhow::Result<()> {
+            pub unsafe fn hook(address: u64) -> Result<(), rivets::retour::Error> {
                 let compiled_function: #cpp_function_header = std::mem::transmute(address);
                 Detour.initialize(compiled_function, #name)?.enable()?;
                 Ok(())
@@ -160,17 +160,16 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
     result.into()
 }
 
-/// A procedural macro for initializing the rivets library.
-/// This macro should be called once at the end of the `main.rs` file.
-/// It will initialize the rivets library and inject all of the detours.
+/// ## DO NOT USE THIS MACRO
+/// This macro is used internally by the `rivets` factorio mod.
 #[proc_macro]
-pub fn initialize(_item: TokenStream) -> TokenStream {
+pub fn _finalize(_item: TokenStream) -> TokenStream {
     let injects = unsafe { MANGLED_NAMES.clone() };
     let injects = injects.iter().map(|(mangled_name, name)| {
         let name = Ident::new(name, proc_macro2::Span::call_site());
         quote! {
-            if let Err(e) = rivets::inject(#mangled_name, #name::hook) {
-                eprintln!("{e}");
+            if let Err(e) = unsafe { inject(#mangled_name, #name::hook) } {
+                panic!("{e}");
             }
         }
     });

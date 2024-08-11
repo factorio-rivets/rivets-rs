@@ -4,8 +4,9 @@
 pub mod defines;
 
 extern crate rivets_macros;
-pub use rivets_macros::detour;
-pub use rivets_macros::initialize;
+pub use rivets_macros::*;
 
 extern crate rivets_shared;
 pub use rivets_shared::*;
+
+pub use retour;
