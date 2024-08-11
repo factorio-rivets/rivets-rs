@@ -9,16 +9,7 @@ repository = "https://github.com/factorio-rivets/rivets"
 [dependencies]
 cpp_demangle = "0.4"
 undname = "1.1"
-pdb = "0.8"
-anyhow = "1.0"
-windows = { version = "0.58", features = [
-    "Win32",
-    "Win32_System",
-    "Win32_System_LibraryLoader",
-] }
 syn = "2.0"
-proc-macro2 = "1.0"
-dirs = "5.0.1"
 
 [lib]
 name = "rivets_shared"

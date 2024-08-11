@@ -1,17 +1,5 @@
 use cpp_demangle::Symbol;
-use std::ffi::CStr;
 use undname::Flags;
-use windows::core::PCSTR;
-
-pub trait AsPcstr {
-    fn as_pcstr(&self) -> PCSTR;
-}
-
-impl AsPcstr for CStr {
-    fn as_pcstr(&self) -> PCSTR {
-        PCSTR(self.as_ptr().cast())
-    }
-}
 
 /// Attempts to demangle a mangled MSVC C++ symbol name. First tries MSVC demangling, then falls back to Itanium.
 #[must_use]
