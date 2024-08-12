@@ -1,7 +1,7 @@
-use cpp_demangle::Symbol;
-use undname::Flags;
 use abi_stable::std_types::{RBoxError, RResult, RString, RVec};
 use abi_stable::StableAbi;
+use cpp_demangle::Symbol;
+use undname::Flags;
 
 /// Attempts to demangle a mangled MSVC C++ symbol name. First tries MSVC demangling, then falls back to Itanium.
 #[must_use]
