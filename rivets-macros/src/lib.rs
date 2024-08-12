@@ -143,10 +143,13 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
             #[allow(unused_variables)]
             #callback
 
-            pub unsafe fn hook(address: u64) -> Result<(), rivets::retour::Error> {
-                let compiled_function: #cpp_function_header = std::mem::transmute(address);
-                Detour.initialize(compiled_function, #name)?.enable()?;
-                Ok(())
+            pub unsafe extern "C" fn hook(address: u64) -> rivets::abi_stable::std_types::RResult<(), rivets::abi_stable::std_types::RBoxError> {
+                unsafe fn hook(address: u64) -> Result<(), rivets::retour::Error> {
+                    let compiled_function: #cpp_function_header = std::mem::transmute(address);
+                    Detour.initialize(compiled_function, #name)?.enable()?;
+                    Ok(())
+                }
+                hook(address).map_err(|e| rivets::abi_stable::std_types::RBoxError::new(e)).into()
             }
         }
     };
@@ -160,25 +163,32 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
     result.into()
 }
 
-/// ## DO NOT USE THIS MACRO
-/// This macro is used internally by the `rivets` factorio mod.
+/// A procedural macro for initializing the rivets library.
+/// This macro should be called once at the end of the `main.rs` file.
+/// It will initialize the rivets library and inject all of the detours.
 #[proc_macro]
-pub fn _finalize(_item: TokenStream) -> TokenStream {
+pub fn initialize(_: TokenStream) -> TokenStream {
     let injects = unsafe { MANGLED_NAMES.clone() };
     let injects = injects.iter().map(|(mangled_name, name)| {
         let name = Ident::new(name, proc_macro2::Span::call_site());
         quote! {
-            if let Err(e) = unsafe { inject(#mangled_name, #name::hook) } {
-                panic!("{e}");
-            }
+            hooks.push(
+                rivets::RivetsHook {
+                    mangled_name: #mangled_name.into(),
+                    hook: #name::hook
+                }
+            );
         }
     });
 
+    let vec = quote! { abi_stable::std_types::RVec };
+
     quote! {
-        #[ctor::ctor]
-        fn ctor() {
-            println!("Rivets initialized!");
+        #[rivets::abi_stable::sabi_extern_fn]
+        pub extern "C" fn rivets_initialize() -> #vec<rivets::RivetsHook> {
+            let mut hooks: #vec<rivets::RivetsHook> = #vec::new();
             #(#injects)*
+            hooks
         }
     }
     .into()

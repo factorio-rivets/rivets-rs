@@ -11,7 +11,7 @@ repository = "https://github.com/factorio-rivets/rivets-rs"
 rivets-macros = { path = "rivets-macros" }
 rivets-shared = { path = "rivets-shared" }
 retour = { version = "0.3", features = ["static-detour"] }
-abi_stable = "0.11.3"
+abi_stable = "0.11"
 
 [lints.clippy]
 nursery = { level = "warn", priority = -1 }
