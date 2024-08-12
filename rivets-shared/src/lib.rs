@@ -1,5 +1,7 @@
 use cpp_demangle::Symbol;
 use undname::Flags;
+use abi_stable::std_types::{RBoxError, RResult, RString, RVec};
+use abi_stable::StableAbi;
 
 /// Attempts to demangle a mangled MSVC C++ symbol name. First tries MSVC demangling, then falls back to Itanium.
 #[must_use]
@@ -40,3 +42,16 @@ pub fn get_calling_convention(abi: &str) -> Option<syn::Abi> {
 /// }
 /// ```
 pub type Opaque = *const std::ffi::c_void;
+
+#[repr(C)]
+#[derive(StableAbi)]
+pub struct RivetsHook {
+    pub mangled_name: RString,
+    pub hook: unsafe extern "C" fn(u64) -> RResult<(), RBoxError>,
+}
+
+#[repr(C)]
+#[derive(StableAbi)]
+pub struct RivetsInitializeABI {
+    pub get_hooks: extern "C" fn() -> RVec<RivetsHook>,
+}

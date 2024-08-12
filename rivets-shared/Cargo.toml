@@ -10,6 +10,7 @@ repository = "https://github.com/factorio-rivets/rivets"
 cpp_demangle = "0.4"
 undname = "1.1"
 syn = "2.0"
+abi_stable = "0.11"
 
 [lib]
 name = "rivets_shared"
