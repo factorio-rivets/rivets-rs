@@ -10,3 +10,4 @@ extern crate rivets_shared;
 pub use rivets_shared::*;
 
 pub use retour;
+pub use abi_stable;
