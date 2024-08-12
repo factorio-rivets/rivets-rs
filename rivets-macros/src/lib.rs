@@ -163,11 +163,11 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
     result.into()
 }
 
-/// A procedural macro for initializing the rivets library.
+/// A procedural macro for finalizing the rivets library.
 /// This macro should be called once at the end of the `main.rs` file.
-/// It will initialize the rivets library and inject all of the detours.
+/// It will finalize the rivets library and inject all of the detours.
 #[proc_macro]
-pub fn initialize(_: TokenStream) -> TokenStream {
+pub fn finalize(_: TokenStream) -> TokenStream {
     let injects = unsafe { MANGLED_NAMES.clone() };
     let injects = injects.iter().map(|(mangled_name, name)| {
         let name = Ident::new(name, proc_macro2::Span::call_site());
@@ -185,7 +185,7 @@ pub fn initialize(_: TokenStream) -> TokenStream {
 
     quote! {
         #[rivets::abi_stable::sabi_extern_fn]
-        pub extern "C" fn rivets_initialize() -> #vec<rivets::RivetsHook> {
+        pub extern "C" fn rivets_finalize() -> #vec<rivets::RivetsHook> {
             let mut hooks: #vec<rivets::RivetsHook> = #vec::new();
             #(#injects)*
             hooks

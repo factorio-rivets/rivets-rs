@@ -52,6 +52,6 @@ pub struct RivetsHook {
 
 #[repr(C)]
 #[derive(StableAbi)]
-pub struct RivetsInitializeABI {
+pub struct RivetsFinalizeABI {
     pub get_hooks: extern "C" fn() -> RVec<RivetsHook>,
 }
