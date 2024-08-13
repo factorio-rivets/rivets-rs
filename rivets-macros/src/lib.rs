@@ -185,7 +185,7 @@ pub fn finalize(_: TokenStream) -> TokenStream {
 
     quote! {
         #[rivets::abi_stable::sabi_extern_fn]
-        pub extern "C" fn rivets_entry_point() -> #vec<rivets::RivetsHook> {
+        pub extern "C" fn rivets_finalize() -> #vec<rivets::RivetsHook> {
             let mut hooks: #vec<rivets::RivetsHook> = #vec::new();
             #(#injects)*
             hooks
