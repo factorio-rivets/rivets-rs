@@ -1,11 +1,11 @@
 [package]
-name = "rivets"
+name = "rivets-rs"
 version = "0.1.0"
 edition = "2021"
 authors = ["Zachary Picco <zacharypicco@gmail.com>"]
 description = "Rivets is a Factorio mod loader written in Rust. Hook into compiled functions and change their behavior."
 license-file = "LICENSE.md"
-repository = "https://github.com/factorio-rivets/rivets"
+repository = "https://github.com/factorio-rivets/rivets-rs"
 
 [dependencies]
 rivets-macros = { path = "rivets-macros" }
@@ -20,6 +20,4 @@ expect_used = "allow"
 trivial_regex = "allow"
 
 [lib]
-name = "rivets"
 crate-type = ["lib"]
-path = "src/lib.rs"
