@@ -143,7 +143,8 @@ impl SymbolCache {
     /// # Safety
     /// todo!
     pub unsafe fn inject(&self, base_address: u64, hook: &RivetsHook) -> Result<()> {
-        let Some(address) = self.get_function_address(base_address, hook.mangled_name.as_str()) else {
+        let Some(address) = self.get_function_address(base_address, hook.mangled_name.as_str())
+        else {
             bail!(
                 "Failed to find address for the following mangled function inside the PDB: {}",
                 hook.mangled_name
