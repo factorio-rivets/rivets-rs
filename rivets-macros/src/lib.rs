@@ -160,25 +160,42 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
     result.into()
 }
 
-/// ## DO NOT USE THIS MACRO
-/// This macro is used internally by the `rivets` factorio mod.
+/// A procedural macro for finalizing the rivets library.
+/// This macro should be called once at the end of the `main.rs` file.
+/// It will finalize the rivets library and inject all of the detours.
 #[proc_macro]
-pub fn _finalize(_item: TokenStream) -> TokenStream {
+pub fn finalize(_: TokenStream) -> TokenStream {
     let injects = unsafe { MANGLED_NAMES.clone() };
     let injects = injects.iter().map(|(mangled_name, name)| {
         let name = Ident::new(name, proc_macro2::Span::call_site());
         quote! {
-            if let Err(e) = unsafe { inject(#mangled_name, #name::hook) } {
-                panic!("{e}");
-            }
+            hooks.push(
+                rivets::RivetsHook {
+                    mangled_name: #mangled_name.into(),
+                    hook: #name::hook
+                }
+            );
         }
     });
 
     quote! {
-        #[ctor::ctor]
-        fn ctor() {
-            println!("Rivets initialized!");
-            #(#injects)*
+        rivets::dll_syringe::payload_procedure! {
+            fn rivets_finalize(symbol_cache: rivets::SymbolCache) -> Option<String> {
+                let base_address = match symbol_cache.get_module_base_address() {
+                    Ok(base_address) => base_address,
+                    Err(e) => return Some(format!("{e}")),
+                };
+
+                let mut hooks: Vec<rivets::RivetsHook> = Vec::new();
+                #(#injects)*
+                for hook in &hooks {
+                    let inject_result = unsafe { symbol_cache.inject(base_address, hook) };
+                    if inject_result.is_err() {
+                        return Some(format!("{inject_result:?}"));
+                    }
+                }
+                None
+            }
         }
     }
     .into()

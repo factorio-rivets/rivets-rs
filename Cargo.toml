@@ -1,5 +1,5 @@
 [package]
-name = "rivets-rs"
+name = "rivets"
 version = "0.1.0"
 edition = "2021"
 authors = ["Zachary Picco <zacharypicco@gmail.com>"]
@@ -11,6 +11,7 @@ repository = "https://github.com/factorio-rivets/rivets-rs"
 rivets-macros = { path = "rivets-macros" }
 rivets-shared = { path = "rivets-shared" }
 retour = { version = "0.3", features = ["static-detour"] }
+dll-syringe = { version = "0.15", features = ["full"] }
 
 [lints.clippy]
 nursery = { level = "warn", priority = -1 }
