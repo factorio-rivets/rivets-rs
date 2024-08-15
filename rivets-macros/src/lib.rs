@@ -143,13 +143,10 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
             #[allow(unused_variables)]
             #callback
 
-            pub unsafe extern "C" fn hook(address: u64) -> rivets::abi_stable::std_types::RResult<(), rivets::abi_stable::std_types::RBoxError> {
-                unsafe fn hook(address: u64) -> Result<(), rivets::retour::Error> {
-                    let compiled_function: #cpp_function_header = std::mem::transmute(address);
-                    Detour.initialize(compiled_function, #name)?.enable()?;
-                    Ok(())
-                }
-                hook(address).map_err(|e| rivets::abi_stable::std_types::RBoxError::new(e)).into()
+            pub unsafe fn hook(address: u64) -> Result<(), rivets::retour::Error> {
+                let compiled_function: #cpp_function_header = std::mem::transmute(address);
+                Detour.initialize(compiled_function, #name)?.enable()?;
+                Ok(())
             }
         }
     };
@@ -181,15 +178,24 @@ pub fn finalize(_: TokenStream) -> TokenStream {
         }
     });
 
-    let vec = quote! { abi_stable::std_types::RVec };
-
     quote! {
-        #[rivets::abi_stable::sabi_extern_fn]
-        #[no_mangle]
-        pub extern "C" fn rivets_finalize() -> #vec<rivets::RivetsHook> {
-            let mut hooks: #vec<rivets::RivetsHook> = #vec::new();
-            #(#injects)*
-            hooks
+        rivets::dll_syringe::payload_procedure! {
+            fn rivets_finalize(symbol_cache: rivets::SymbolCache) -> Option<String> {
+                let base_address = match symbol_cache.get_module_base_address() {
+                    Ok(base_address) => base_address,
+                    Err(e) => return Some(format!("{e}")),
+                };
+
+                let mut hooks: Vec<rivets::RivetsHook> = Vec::new();
+                #(#injects)*
+                for hook in &hooks {
+                    let inject_result = unsafe { symbol_cache.inject(base_address, hook) };
+                    if inject_result.is_err() {
+                        return Some(format!("{inject_result:?}"));
+                    }
+                }
+                None
+            }
         }
     }
     .into()
