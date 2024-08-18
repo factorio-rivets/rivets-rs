@@ -10,8 +10,9 @@ use proc_macro::{self, Diagnostic, Level, Span, TokenStream};
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{parse_macro_input, Abi, DeriveInput, Error, Expr, FnArg, Ident, ItemFn, Variant};
-use std::sync::{LazyLock, Mutex};
+use std::sync::{atomic::AtomicBool, LazyLock, Mutex};
 
+static IS_FINALIZED: AtomicBool = AtomicBool::new(false);
 static MANGLED_NAMES: LazyLock<Mutex<Vec<(String, String)>>> = LazyLock::new(|| Mutex::new(vec![]));
 static CPP_IMPORTS: LazyLock<Mutex<Vec<(String, String)>>> = LazyLock::new(|| Mutex::new(vec![]));
 
@@ -20,6 +21,14 @@ macro_rules! derive_error {
         Error::new(proc_macro2::Span::call_site(), $string)
             .to_compile_error()
             .into()
+    };
+}
+
+macro_rules! check_finalized {
+    () => {
+        if IS_FINALIZED.load(std::sync::atomic::Ordering::Relaxed) {
+            panic!("The rivets library has already been finalized!");
+        }
     };
 }
 
@@ -92,6 +101,8 @@ fn determine_calling_convention(input: &ItemFn, unmangled_name: &str) -> Result<
 /// See the `pdb2hpp` module for a tool that can generate the correct FFI types for C++ functions.
 #[proc_macro_attribute]
 pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
+    check_finalized!();
+
     let mangled_name = attr.to_string();
     let unmangled_name =
         rivets_shared::demangle(&mangled_name).unwrap_or_else(|| mangled_name.clone());
@@ -155,7 +166,7 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
-    MANGLED_NAMES.lock().unwrap().push((mangled_name.clone(), name.to_string()));
+    MANGLED_NAMES.lock().expect("Failed to lock mangled names").push((mangled_name.clone(), name.to_string()));
 
     Diagnostic::spanned(Span::call_site(), Level::Note, unmangled_name.clone()).emit();
 
@@ -200,6 +211,8 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// Calling any summoned function repersents calling into the C++ compiled codebase and thus is inherently unsafe.
 #[proc_macro_attribute]
 pub fn summon(attr: TokenStream, item: TokenStream) -> TokenStream {
+    check_finalized!();
+
     let mangled_name = attr.to_string();
     let unmangled_name =
         rivets_shared::demangle(&mangled_name).unwrap_or_else(|| mangled_name.clone());
@@ -231,7 +244,8 @@ pub fn summon(attr: TokenStream, item: TokenStream) -> TokenStream {
     let name = &input.sig.ident;
     let function_type = quote! { #attr #vis unsafe #calling_convention fn(#(#arg_types),*) #return_type };
 
-    CPP_IMPORTS.lock().unwrap().push((mangled_name.clone(), name.to_string()));
+    CPP_IMPORTS.lock().expect("Failed to lock cpp imports"
+    ).push((mangled_name.clone(), name.to_string()));
 
     Diagnostic::spanned(Span::call_site(), Level::Note, unmangled_name.clone()).emit();
 
@@ -242,7 +256,7 @@ pub fn summon(attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 fn get_hooks() -> Vec<proc_macro2::TokenStream> {
-    MANGLED_NAMES.lock().unwrap()
+    MANGLED_NAMES.lock().expect("Failed to lock mangled names")
         .iter()
         .map(|(mangled_name, module_name)| {
             let module_name = Ident::new(module_name, proc_macro2::Span::call_site());
@@ -259,7 +273,7 @@ fn get_hooks() -> Vec<proc_macro2::TokenStream> {
 }
 
 fn get_summons() -> Vec<proc_macro2::TokenStream> {
-    CPP_IMPORTS.lock().unwrap()
+    CPP_IMPORTS.lock().expect("Failed to lock cpp imports")
         .iter()
         .map(|(mangled_name, rust_name)| {
             let rust_name = Ident::new(rust_name, proc_macro2::Span::call_site());
@@ -284,6 +298,9 @@ fn get_summons() -> Vec<proc_macro2::TokenStream> {
 /// It will finalize the rivets library and inject all of the detours.
 #[proc_macro]
 pub fn finalize(_: TokenStream) -> TokenStream {
+    check_finalized!();
+    IS_FINALIZED.store(true, std::sync::atomic::Ordering::Relaxed);
+
     let hooks = get_hooks();
     let summons = get_summons();
 
