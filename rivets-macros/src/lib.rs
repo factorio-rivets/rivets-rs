@@ -9,8 +9,8 @@ use lazy_regex::regex;
 use proc_macro::{self, Diagnostic, Level, Span, TokenStream};
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{parse_macro_input, Abi, DeriveInput, Error, Expr, FnArg, Ident, ItemFn, Variant};
 use std::sync::{atomic::AtomicBool, LazyLock, Mutex};
+use syn::{parse_macro_input, Abi, DeriveInput, Error, Expr, FnArg, Ident, ItemFn, Variant};
 
 static IS_FINALIZED: AtomicBool = AtomicBool::new(false);
 static MANGLED_NAMES: LazyLock<Mutex<Vec<(String, String)>>> = LazyLock::new(|| Mutex::new(vec![]));
@@ -166,7 +166,10 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
-    MANGLED_NAMES.lock().expect("Failed to lock mangled names").push((mangled_name.clone(), name.to_string()));
+    MANGLED_NAMES
+        .lock()
+        .expect("Failed to lock mangled names")
+        .push((mangled_name.clone(), name.to_string()));
 
     Diagnostic::spanned(Span::call_site(), Level::Note, unmangled_name.clone()).emit();
 
@@ -223,16 +226,14 @@ pub fn summon(attr: TokenStream, item: TokenStream) -> TokenStream {
         Ok(calling_convention) => Some(calling_convention),
         Err(e) => return failure(quote! { #input }, &e.to_string()),
     };
-    
-    let arg_types = input.sig.inputs.iter().map(|arg| {
-        match arg {
-            FnArg::Receiver(_) => {
-                quote! {compile_error!("Summoned functions cannot use the self parameter.")}
-            }
-            FnArg::Typed(pat) => {
-                let ty = &pat.ty;
-                quote! { #ty }
-            }
+
+    let arg_types = input.sig.inputs.iter().map(|arg| match arg {
+        FnArg::Receiver(_) => {
+            quote! {compile_error!("Summoned functions cannot use the self parameter.")}
+        }
+        FnArg::Typed(pat) => {
+            let ty = &pat.ty;
+            quote! { #ty }
         }
     });
 
@@ -242,10 +243,13 @@ pub fn summon(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr = quote! { #(#attr)* };
 
     let name = &input.sig.ident;
-    let function_type = quote! { #attr #vis unsafe #calling_convention fn(#(#arg_types),*) #return_type };
+    let function_type =
+        quote! { #attr #vis unsafe #calling_convention fn(#(#arg_types),*) #return_type };
 
-    CPP_IMPORTS.lock().expect("Failed to lock cpp imports"
-    ).push((mangled_name.clone(), name.to_string()));
+    CPP_IMPORTS
+        .lock()
+        .expect("Failed to lock cpp imports")
+        .push((mangled_name.clone(), name.to_string()));
 
     Diagnostic::spanned(Span::call_site(), Level::Note, unmangled_name.clone()).emit();
 
@@ -256,7 +260,9 @@ pub fn summon(attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 fn get_hooks() -> Vec<proc_macro2::TokenStream> {
-    MANGLED_NAMES.lock().expect("Failed to lock mangled names")
+    MANGLED_NAMES
+        .lock()
+        .expect("Failed to lock mangled names")
         .iter()
         .map(|(mangled_name, module_name)| {
             let module_name = Ident::new(module_name, proc_macro2::Span::call_site());

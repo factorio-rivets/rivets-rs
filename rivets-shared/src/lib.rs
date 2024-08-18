@@ -160,7 +160,8 @@ impl SymbolCache {
 /// Invariant: If the function is not initialized, it is UB to dereference it.
 /// The rivets::finalize!() macro should be used to ensure that the function is initialized.
 pub enum UnsafeSummonedFunction<T>
-where T: 'static + Sized
+where
+    T: 'static + Sized,
 {
     Function(T),
     Uninitialized,
