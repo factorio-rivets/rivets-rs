@@ -10,6 +10,10 @@ use proc_macro::{self, Diagnostic, Level, Span, TokenStream};
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{parse_macro_input, Abi, DeriveInput, Error, Expr, FnArg, Ident, ItemFn, Variant};
+use std::sync::{LazyLock, Mutex};
+
+static MANGLED_NAMES: LazyLock<Mutex<Vec<(String, String)>>> = LazyLock::new(|| Mutex::new(vec![]));
+static CPP_IMPORTS: LazyLock<Mutex<Vec<(String, String)>>> = LazyLock::new(|| Mutex::new(vec![]));
 
 macro_rules! derive_error {
     ($string: tt) => {
@@ -151,9 +155,7 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
-    unsafe {
-        MANGLED_NAMES.push((mangled_name.clone(), name.to_string()));
-    }
+    MANGLED_NAMES.lock().unwrap().push((mangled_name.clone(), name.to_string()));
 
     Diagnostic::spanned(Span::call_site(), Level::Note, unmangled_name.clone()).emit();
 
@@ -229,9 +231,7 @@ pub fn summon(attr: TokenStream, item: TokenStream) -> TokenStream {
     let name = &input.sig.ident;
     let function_type = quote! { #attr #vis unsafe #calling_convention fn(#(#arg_types),*) #return_type };
 
-    unsafe {
-        SUMMONS.push((mangled_name.clone(), name.to_string()));
-    }
+    CPP_IMPORTS.lock().unwrap().push((mangled_name.clone(), name.to_string()));
 
     Diagnostic::spanned(Span::call_site(), Level::Note, unmangled_name.clone()).emit();
 
@@ -241,9 +241,8 @@ pub fn summon(attr: TokenStream, item: TokenStream) -> TokenStream {
     }.into()
 }
 
-static mut MANGLED_NAMES: Vec<(String, String)> = vec![]; // todo: turn this into a Lazy or OnceCell to fix unsafety issues
 fn get_hooks() -> Vec<proc_macro2::TokenStream> {
-    unsafe { MANGLED_NAMES.clone() }
+    MANGLED_NAMES.lock().unwrap()
         .iter()
         .map(|(mangled_name, module_name)| {
             let module_name = Ident::new(module_name, proc_macro2::Span::call_site());
@@ -259,9 +258,8 @@ fn get_hooks() -> Vec<proc_macro2::TokenStream> {
         .collect()
 }
 
-static mut SUMMONS: Vec<(String, String)> = vec![]; // todo: turn this into a Lazy or OnceCell to fix unsafety issues
 fn get_summons() -> Vec<proc_macro2::TokenStream> {
-    unsafe { SUMMONS.clone() }
+    CPP_IMPORTS.lock().unwrap()
         .iter()
         .map(|(mangled_name, rust_name)| {
             let rust_name = Ident::new(rust_name, proc_macro2::Span::call_site());
