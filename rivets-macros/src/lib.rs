@@ -176,12 +176,12 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
     result.into()
 }
 
-/// A procedural macro for summoning a C++ compiled function into the rust scope.
+/// A procedural macro for importing a C++ compiled function into the rust scope.
 /// This macro is useful in the case where you need to directly call any C++ function from rust.
 ///
 /// # Arguments
-/// * `mangled_name` - The mangled name of the C++ function to summon.
-/// * `dll_name` (optional) - Argument for the name of the DLL to summon the function from. If not provided, factorio.exe will be used.
+/// * `mangled_name` - The mangled name of the C++ function to import.
+/// * `dll_name` (optional) - Argument for the name of the DLL to import the function from. If not provided, factorio.exe will be used.
 ///
 /// Note that most Factorio libraries (such as allegro and lua) are statically linked. In this case, the `dll_name` argument is not needed.
 ///
@@ -189,7 +189,7 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 /// // Summons the lua_gettop function from the compiled lua library.
 /// // lua_gettop is compiled without name mangling, so calling convention (in this case, extern "C") must be manually provided.
-/// #[summon(lua_gettop)]
+/// #[import(lua_gettop)]
 /// extern "C" fn lua_gettop(lua_state: *mut luastate::lua_State) -> i64 {}
 ///
 /// // Calls the lua_gettop function with correct arguments.
@@ -200,7 +200,7 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// # Safety
-/// The arguments and return type of the summoned function must be exactly matching FFI types.
+/// The arguments and return type of the imported function must be exactly matching FFI types.
 /// All structs, classes, enums, and union arguments must have a corresponding `#[repr(C)]` attribute and must also have the correct offsets and sizes.
 /// Alternatively, the user can use the `rivets::Opaque` type to represent any arbitrary FFI data if you do not intend to interact with the data.
 /// See the `pdb2hpp` module for a tool that can generate the correct FFI types for C++ functions.
@@ -211,9 +211,9 @@ pub fn detour(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     - If the calling convention is not present in the mangled name, the user must specify the calling convention manually.
 ///     - In rare cases the function may use a non-standard calling convention. In this case, the user must manually populate the required stack and registers via inline assembly.
 ///
-/// Calling any summoned function repersents calling into the C++ compiled codebase and thus is inherently unsafe.
+/// Calling any imported function repersents calling into the C++ compiled codebase and thus is inherently unsafe.
 #[proc_macro_attribute]
-pub fn summon(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn import(attr: TokenStream, item: TokenStream) -> TokenStream {
     check_finalized!();
 
     let mangled_name = attr.to_string();
@@ -278,7 +278,7 @@ fn get_hooks() -> Vec<proc_macro2::TokenStream> {
         .collect()
 }
 
-fn get_summons() -> Vec<proc_macro2::TokenStream> {
+fn get_imports() -> Vec<proc_macro2::TokenStream> {
     CPP_IMPORTS.lock().expect("Failed to lock cpp imports")
         .iter()
         .map(|(mangled_name, rust_name)| {
@@ -308,7 +308,7 @@ pub fn finalize(_: TokenStream) -> TokenStream {
     IS_FINALIZED.store(true, std::sync::atomic::Ordering::Relaxed);
 
     let hooks = get_hooks();
-    let summons = get_summons();
+    let imports = get_imports();
 
     let finalize = quote! {
         fn rivets_finalize(symbol_cache: rivets::SymbolCache) -> Option<String> {
@@ -317,7 +317,7 @@ pub fn finalize(_: TokenStream) -> TokenStream {
                 Err(e) => return Some(format!("{e}")),
             };
 
-            #(#summons)*
+            #(#imports)*
 
             let mut hooks: Vec<rivets::RivetsHook> = Vec::new();
             #(#hooks)*

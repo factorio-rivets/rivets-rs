@@ -156,7 +156,7 @@ impl SymbolCache {
     }
 }
 
-/// Represents a function that has been summoned from a C++ compiled DLL.
+/// Represents a function that has been imported from a C++ compiled DLL.
 /// Invariant: If the function is not initialized, it is UB to dereference it.
 /// The rivets::finalize!() macro should be used to ensure that the function is initialized.
 pub enum UnsafeSummonedFunction<T>
