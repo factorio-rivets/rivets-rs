@@ -5,6 +5,7 @@ use serde::{Deserialize as SerdeDeserialize, Serialize as SerdeSerialize};
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::fs::File;
+use std::ops::Deref;
 use std::path::Path;
 use undname::Flags;
 use windows::core::PCSTR;
@@ -152,5 +153,29 @@ impl SymbolCache {
         };
 
         Ok((hook.hook)(address)?)
+    }
+}
+
+/// Represents a function that has been imported from a C++ compiled DLL.
+/// Invariant: If the function is not initialized, it is UB to dereference it.
+/// The rivets::finalize!() macro should be used to ensure that the function is initialized.
+pub enum UnsafeSummonedFunction<T>
+where
+    T: 'static + Sized,
+{
+    Function(T),
+    Uninitialized,
+}
+
+impl<T> Deref for UnsafeSummonedFunction<T> {
+    type Target = T;
+
+    #[inline]
+    #[track_caller]
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Function(x) => x,
+            Self::Uninitialized => unsafe { std::hint::unreachable_unchecked() },
+        }
     }
 }
