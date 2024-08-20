@@ -2,6 +2,7 @@
 #![warn(missing_docs)]
 
 pub mod defines;
+pub mod lua;
 
 extern crate rivets_macros;
 pub use rivets_macros::*;

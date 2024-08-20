@@ -26,6 +26,8 @@ macro_rules! derive_error {
 
 macro_rules! check_finalized {
     () => {
+        // this check causes issues with rust-analyer. disable during debug builds.
+        #[cfg(not(debug_assertions))]
         if IS_FINALIZED.load(std::sync::atomic::Ordering::Relaxed) {
             panic!("The rivets library has already been finalized!");
         }
@@ -243,8 +245,7 @@ pub fn import(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr = quote! { #(#attr)* };
 
     let name = &input.sig.ident;
-    let function_type =
-        quote! { #attr #vis unsafe #calling_convention fn(#(#arg_types),*) #return_type };
+    let function_type = quote! { unsafe #calling_convention fn(#(#arg_types),*) #return_type };
 
     CPP_IMPORTS
         .lock()
@@ -255,7 +256,8 @@ pub fn import(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     quote! {
         #[allow(non_upper_case_globals)]
-        static mut #name: rivets::UnsafeSummonedFunction<#function_type> = rivets::UnsafeSummonedFunction::Uninitialized;
+        #[allow(missing_docs)]
+        #attr #vis static mut #name: rivets::UnsafeSummonedFunction<#function_type> = rivets::UnsafeSummonedFunction::Uninitialized;
     }.into()
 }
 
