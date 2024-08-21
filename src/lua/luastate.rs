@@ -5,17 +5,20 @@ use std::ffi::{
 };
 use std::fmt::Debug;
 
-type size_t = c_ulong; // c_size_t is nightly only, defaults to usize currently -> 64 bit
-type lu_byte = c_char;
-type lua_Number = c_double;
-type lua_CFunction = unsafe extern "C-unwind" fn(L: *mut lua_State) -> c_int;
-type lua_Hook = unsafe extern "C-unwind" fn(L: *mut lua_State, ar: *mut lua_Debug);
-type lua_Alloc = unsafe extern "C-unwind" fn(
+pub type lua_CFunction = unsafe extern "C-unwind" fn(L: *mut lua_State) -> c_int;
+pub type lua_Hook = unsafe extern "C-unwind" fn(L: *mut lua_State, ar: *mut lua_Debug);
+pub type lua_Alloc = unsafe extern "C-unwind" fn(
     ud: *mut c_void,
     ptr: *mut c_void,
     osize: usize,
     nsize: usize,
 ) -> *mut c_void;
+pub type lua_Writer =
+    unsafe extern "C" fn(L: *mut lua_State, p: *const c_void, sz: usize, ud: *mut c_void) -> c_int;
+
+type size_t = c_ulong; // c_size_t is nightly only, defaults to usize currently -> 64 bit
+type lu_byte = c_char;
+type lua_Number = c_double;
 type Instruction = c_uint; // 32 bit
 type ptrdiff_t = isize; // https://en.cppreference.com/w/cpp/types/ptrdiff_t
 type luai_jmpbuf = c_int;
