@@ -18,7 +18,7 @@ static CPP_IMPORTS: LazyLock<Mutex<Vec<(String, String)>>> = LazyLock::new(|| Mu
 
 fn derive_error(error_message: &str) -> TokenStream {
     Diagnostic::spanned(Span::call_site(), Level::Error, error_message).emit();
-    quote!{}.into()
+    quote! {}.into()
 }
 
 /// Asserts if the rivets library has already been finalized.
@@ -26,7 +26,7 @@ fn derive_error(error_message: &str) -> TokenStream {
 ///    - `detour`
 ///    - `import`
 ///    - `finalize`
-/// 
+///
 /// Note that this check is only preformed in release builds.
 fn check_finalized() {
     // this check causes issues with rust-analyer. disable during debug builds.

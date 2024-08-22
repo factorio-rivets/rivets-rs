@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 #![warn(missing_docs)]
+#![feature(c_size_t)]
 
 pub mod defines;
 pub mod lua;
