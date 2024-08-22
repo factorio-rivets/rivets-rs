@@ -17,3 +17,4 @@ darling = "0.20"
 
 [lib]
 proc-macro = true
+path = "src/macros.rs"

@@ -159,7 +159,7 @@ impl SymbolCache {
 /// Represents a function that has been imported from a C++ compiled DLL.
 /// Invariant: If the function is not initialized, it is UB to dereference it.
 /// The rivets::finalize!() macro should be used to ensure that the function is initialized.
-pub enum UnsafeSummonedFunction<T>
+pub enum UnsafeImportedFunction<T>
 where
     T: 'static + Sized,
 {
@@ -167,7 +167,7 @@ where
     Uninitialized,
 }
 
-impl<T> Deref for UnsafeSummonedFunction<T> {
+impl<T> Deref for UnsafeImportedFunction<T> {
     type Target = T;
 
     #[inline]
@@ -175,7 +175,7 @@ impl<T> Deref for UnsafeSummonedFunction<T> {
     fn deref(&self) -> &Self::Target {
         match self {
             Self::Function(x) => x,
-            Self::Uninitialized => unsafe { std::hint::unreachable_unchecked() },
+            Self::Uninitialized => unreachable!("Attempted to dereference an uninitialized imported function pointer! This is a bug in rivets core, please report it."),
         }
     }
 }

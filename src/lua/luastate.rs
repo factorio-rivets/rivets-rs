@@ -1,26 +1,45 @@
 #![allow(non_camel_case_types, non_snake_case, dead_code, missing_docs)]
 
+use core::ffi::c_size_t;
 use std::ffi::{
     c_char, c_double, c_int, c_longlong, c_short, c_uchar, c_uint, c_ulong, c_ushort, c_void,
 };
 use std::fmt::Debug;
 
-type size_t = c_ulong; // c_size_t is nightly only, defaults to usize currently -> 64 bit
+pub type lua_Number = c_double;
+pub type lua_Unsigned = c_uint;
+pub type lua_Integer = i64;
+
 type lu_byte = c_char;
-type lua_Number = c_double;
-type lua_CFunction = unsafe extern "C-unwind" fn(L: *mut lua_State) -> c_int;
-type lua_Hook = unsafe extern "C-unwind" fn(L: *mut lua_State, ar: *mut lua_Debug);
-type lua_Alloc = unsafe extern "C-unwind" fn(
+type Instruction = c_uint; // 32 bit
+type ptrdiff_t = isize; // https://en.cppreference.com/w/cpp/types/ptrdiff_t
+type luai_jmpbuf = c_int;
+type lu_mem = c_size_t;
+type l_mem = ptrdiff_t;
+
+pub type lua_CFunction = unsafe extern "C-unwind" fn(L: *mut lua_State) -> c_int;
+
+pub type lua_Hook = unsafe extern "C-unwind" fn(L: *mut lua_State, ar: *mut lua_Debug);
+
+pub type lua_Alloc = unsafe extern "C-unwind" fn(
     ud: *mut c_void,
     ptr: *mut c_void,
     osize: usize,
     nsize: usize,
 ) -> *mut c_void;
-type Instruction = c_uint; // 32 bit
-type ptrdiff_t = isize; // https://en.cppreference.com/w/cpp/types/ptrdiff_t
-type luai_jmpbuf = c_int;
-type lu_mem = size_t;
-type l_mem = ptrdiff_t;
+
+pub type lua_Writer = unsafe extern "C-unwind" fn(
+    L: *mut lua_State,
+    p: *const c_void,
+    sz: usize,
+    ud: *mut c_void,
+) -> c_int;
+
+pub type lua_Reader = unsafe extern "C-unwind" fn(
+    L: *mut lua_State,
+    ud: *mut c_void,
+    sz: *mut c_size_t,
+) -> *const c_char;
 
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
@@ -57,7 +76,7 @@ pub struct TStringInner {
     // common header
     extra: lu_byte,
     hash: c_uint,
-    len: size_t,
+    len: c_size_t,
 }
 
 #[derive(Clone, Copy)]
@@ -377,8 +396,8 @@ pub struct lua_State {
 #[repr(C)]
 pub struct Mbuffer {
     buffer: *mut c_char,
-    n: size_t,
-    buffsize: size_t,
+    n: c_size_t,
+    buffsize: c_size_t,
 }
 
 #[derive(Clone, Copy, Debug)]
