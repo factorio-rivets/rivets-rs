@@ -391,11 +391,7 @@ pub extern "C-unwind" fn lua_tonumberx(
 }
 
 #[import(lua_topointer)]
-pub extern "C-unwind" fn lua_topointer(
-    lua_state: *mut lua_State,
-    index: c_int,
-) -> *const c_void {
-}
+pub extern "C-unwind" fn lua_topointer(lua_state: *mut lua_State, index: c_int) -> *const c_void {}
 
 #[import(lua_tothread)]
 pub extern "C-unwind" fn lua_tothread(lua_state: *mut lua_State, index: c_int) -> *mut lua_State {}
@@ -409,21 +405,13 @@ pub extern "C-unwind" fn lua_tounsignedx(
 }
 
 #[import(lua_touserdata)]
-pub extern "C-unwind" fn lua_touserdata(
-    lua_state: *mut lua_State,
-    index: c_int,
-) -> *mut c_void {
-}
+pub extern "C-unwind" fn lua_touserdata(lua_state: *mut lua_State, index: c_int) -> *mut c_void {}
 
 #[import(lua_type)]
 pub extern "C-unwind" fn lua_type(lua_state: *mut lua_State, index: c_int) -> c_int {}
 
 #[import(lua_typename)]
-pub extern "C-unwind" fn lua_typename(
-    lua_state: *mut lua_State,
-    type_: c_int,
-) -> *const c_char {
-}
+pub extern "C-unwind" fn lua_typename(lua_state: *mut lua_State, type_: c_int) -> *const c_char {}
 
 #[import(lua_upvalueid)]
 pub extern "C-unwind" fn lua_upvalueid(
@@ -447,9 +435,4 @@ pub extern "C-unwind" fn lua_upvaluejoin(
 pub extern "C-unwind" fn lua_version(lua_state: *mut lua_State) -> *const lua_Number {}
 
 #[import(lua_xmove)]
-pub extern "C-unwind" fn lua_xmove(
-    from: *mut lua_State,
-    to: *mut lua_State,
-    n: c_int,
-) {
-}
+pub extern "C-unwind" fn lua_xmove(from: *mut lua_State, to: *mut lua_State, n: c_int) {}
