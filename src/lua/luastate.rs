@@ -14,7 +14,7 @@ pub type lua_Alloc = unsafe extern "C-unwind" fn(
     nsize: usize,
 ) -> *mut c_void;
 pub type lua_Writer =
-    unsafe extern "C" fn(L: *mut lua_State, p: *const c_void, sz: usize, ud: *mut c_void) -> c_int;
+    unsafe extern "C-unwind" fn(L: *mut lua_State, p: *const c_void, sz: usize, ud: *mut c_void) -> c_int;
 
 type size_t = c_ulong; // c_size_t is nightly only, defaults to usize currently -> 64 bit
 type lu_byte = c_char;
